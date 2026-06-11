@@ -1,10 +1,14 @@
-use reqwest::{Client, Method, Request, Url};
-use std::env;
-use std::process;
+use hyper::client::HttpConnector;
+use hyper::Client;
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::net::TcpStream;
 use tokio::signal;
 use tokio::sync::watch;
+use tokio::time::timeout;
+use std::env;
+use std::process;
 
 #[tokio::main]
 async fn main() {
@@ -13,58 +17,48 @@ async fn main() {
         eprintln!("Usage: {} <url>", args[0]);
         process::exit(1);
     }
-    
-    // Validasi URL sekali saja di awal
-    let target_url = Url::parse(&args[1]).unwrap_or_else(|_| {
-        eprintln!("URL tidak valid.");
-        process::exit(1);
-    });
+    let target_url = args[1].clone();
 
-    // Optimasi transportasi tingkat tinggi
+    let mut http = HttpConnector::new();
+    http.set_connect_timeout(Some(Duration::from_secs(2)));
+    http.set_nodelay(true);
+    http.set_keepalive(Some(Duration::from_secs(30)));
+
+    let tls = HttpsConnectorBuilder::new()
+        .with_native_roots()
+        .unwrap_or_else(|_| HttpsConnectorBuilder::new().with_webpki_roots())
+        .https_only()
+        .enable_http2()
+        .with_connector(http);
+
     let client = Client::builder()
-        .danger_accept_invalid_certs(true)
-        .danger_accept_invalid_hostnames(true)
-        .http2_prior_knowledge()
-        .pool_max_idle_per_host(5000)
         .pool_idle_timeout(Duration::from_secs(60))
-        .timeout(Duration::from_secs(3))
-        .tcp_nodelay(true) // Memaksa paket langsung dikirim (NoDelay) seperti Go
-        .build()
-        .unwrap();
+        .pool_max_idle_per_host(5000)
+        .http2_only(true)
+        .build::<_, hyper::Body>(tls);
 
     let client = Arc::new(client);
 
-    // MEMBUAT TEMPLATE REQUEST DI LUAR LOOP (Sama persis seperti trik Go lu)
-    let mut base_req = Request::new(Method::HEAD, target_url);
-    base_req.headers_mut().insert(
-        reqwest::header::USER_AGENT,
-        reqwest::header::HeaderValue::from_static("curl/8.4.0"),
-    );
-    let shared_req = Arc::new(base_req);
-
-    const WORKERS: usize = 550;
+    let workers = 550;
     let (tx, mut rx) = watch::channel(false);
     let mut handles = vec![];
 
-    println!("[*] Memulai pengujian optimal dengan {} worker...", WORKERS);
-
-    for _ in 0..WORKERS {
+    for _ in 0..workers {
         let client_clone = Arc::clone(&client);
-        let req_clone = Arc::clone(&shared_req);
+        let url_clone = target_url.clone();
         let mut rx_clone = rx.clone();
 
         let handle = tokio::spawn(async move {
+            let req = hyper::Request::head(&url_clone)
+                .header("user-agent", "curl/8.4.0")
+                .body(hyper::Body::empty())
+                .unwrap();
+
             loop {
                 if *rx_clone.borrow() {
                     break;
                 }
-
-                // Melakukan kloning instan terhadap objek request yang sudah jadi (Sangat ringan di memori)
-                if let Some(request) = req_clone.try_clone() {
-                    if let Ok(resp) = client_clone.execute(request).await {
-                        std::mem::drop(resp);
-                    }
-                }
+                let _ = timeout(Duration::from_secs(3), client_clone.request(req.clone())).await;
             }
         });
         handles.push(handle);
@@ -72,7 +66,7 @@ async fn main() {
 
     tokio::select! {
         _ = signal::ctrl_c() => {
-            println!("\n[*] Menerima sinyal berhenti, mematikan worker...");
+            println!("\n[*] Stopping workers...");
         }
     }
 
@@ -80,6 +74,4 @@ async fn main() {
     for handle in handles {
         let _ = handle.await;
     }
-
-    println!("[*] Pengujian selesai.");
 }
