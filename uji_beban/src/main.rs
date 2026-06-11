@@ -1,4 +1,4 @@
-use reqwest::{Client, Method};
+use reqwest::{Client, Method, Request, Url};
 use std::env;
 use std::process;
 use std::sync::Arc;
@@ -13,8 +13,14 @@ async fn main() {
         eprintln!("Usage: {} <url>", args[0]);
         process::exit(1);
     }
-    let target_url = &args[1];
+    
+    // Validasi URL sekali saja di awal
+    let target_url = Url::parse(&args[1]).unwrap_or_else(|_| {
+        eprintln!("URL tidak valid.");
+        process::exit(1);
+    });
 
+    // Optimasi transportasi tingkat tinggi
     let client = Client::builder()
         .danger_accept_invalid_certs(true)
         .danger_accept_invalid_hostnames(true)
@@ -22,37 +28,39 @@ async fn main() {
         .pool_max_idle_per_host(5000)
         .pool_idle_timeout(Duration::from_secs(60))
         .timeout(Duration::from_secs(3))
+        .tcp_nodelay(true) // Memaksa paket langsung dikirim (NoDelay) seperti Go
         .build()
         .unwrap();
 
     let client = Arc::new(client);
-    let url = Arc::new(target_url.clone());
+
+    // MEMBUAT TEMPLATE REQUEST DI LUAR LOOP (Sama persis seperti trik Go lu)
+    let mut base_req = Request::new(Method::HEAD, target_url);
+    base_req.headers_mut().insert(
+        reqwest::header::USER_AGENT,
+        reqwest::header::HeaderValue::from_static("curl/8.4.0"),
+    );
+    let shared_req = Arc::new(base_req);
 
     const WORKERS: usize = 550;
     let (tx, mut rx) = watch::channel(false);
     let mut handles = vec![];
 
-    println!("[*] Memulai pengujian dengan {} worker berbasis Rust...", WORKERS);
+    println!("[*] Memulai pengujian optimal dengan {} worker...", WORKERS);
 
     for _ in 0..WORKERS {
         let client_clone = Arc::clone(&client);
-        let url_clone = Arc::clone(&url);
+        let req_clone = Arc::clone(&shared_req);
         let mut rx_clone = rx.clone();
 
         let handle = tokio::spawn(async move {
-            let user_agent = "curl/8.4.0";
-
             loop {
                 if *rx_clone.borrow() {
                     break;
                 }
 
-                let req = client_clone
-                    .request(Method::HEAD, url_clone.as_str())
-                    .header("User-Agent", user_agent)
-                    .build();
-
-                if let Ok(request) = req {
+                // Melakukan kloning instan terhadap objek request yang sudah jadi (Sangat ringan di memori)
+                if let Some(request) = req_clone.try_clone() {
                     if let Ok(resp) = client_clone.execute(request).await {
                         std::mem::drop(resp);
                     }
