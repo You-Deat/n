@@ -102,7 +102,7 @@ func main() {
 	go func() {
 		<-sigCh
 		activeList.mu.Lock()
-		saveToFile(activeList.proxies, "interrupted")
+		saveToFile(activeList.proxies)
 		activeList.mu.Unlock()
 		os.Exit(0)
 	}()
@@ -110,7 +110,7 @@ func main() {
 	checkProxies(activeList, scraped)
 
 	if len(activeList.proxies) > 0 {
-		saveToFile(activeList.proxies, "active")
+		saveToFile(activeList.proxies)
 	}
 }
 
@@ -259,11 +259,11 @@ func worker(input <-chan Proxy, active *safeList, wg *sync.WaitGroup) {
 	}
 }
 
-func saveToFile(proxies []Proxy, typ string) {
+func saveToFile(proxies []Proxy) {
 	if len(proxies) == 0 {
 		return
 	}
-	name := fmt.Sprintf("proxy.txt")
+	name := "proxy.txt"
 	f, err := os.Create(name)
 	if err != nil {
 		return
@@ -274,5 +274,5 @@ func saveToFile(proxies []Proxy, typ string) {
 		w.WriteString(p.IP + ":" + p.Port + "\n")
 	}
 	w.Flush()
-	fmt.Printf("[+] Saved proxy.txt\n", len(proxies), name)
+	fmt.Println("[+] Saved proxy.txt")
 }
