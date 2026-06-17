@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	SCRAPE_WORKERS = 50
-	CHECK_WORKERS  = 350
+	SCRAPE_WORKERS = 1550
+	CHECK_WORKERS  = 1550
 	CHECK_TIMEOUT  = 3 * time.Second
 	RETRY_COUNT    = 1
 )
@@ -85,7 +85,7 @@ func main() {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 + Scrape  : %d
 + Type    : SOCKS5
-+ Ulimit  : 32768
++ Ulimit  : 1048576
 + Layers  : 7 Support
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -249,7 +249,6 @@ func worker(input <-chan Proxy, active *safeList, wg *sync.WaitGroup) {
 			if resp != nil {
 				resp.Body.Close()
 			}
-			time.Sleep(100 * time.Millisecond)
 		}
 		if ok {
 			fmt.Printf("%s:%s\n", p.IP, p.Port)
@@ -264,7 +263,7 @@ func saveToFile(proxies []Proxy, typ string) {
 	if len(proxies) == 0 {
 		return
 	}
-	name := fmt.Sprintf("%s_proxy_%s.txt", typ, time.Now().Format("20060102_150405"))
+	name := fmt.Sprintf("proxy.txt")
 	f, err := os.Create(name)
 	if err != nil {
 		return
@@ -275,5 +274,5 @@ func saveToFile(proxies []Proxy, typ string) {
 		w.WriteString(p.IP + ":" + p.Port + "\n")
 	}
 	w.Flush()
-	fmt.Printf("[+] Saved %d proxies to %s\n", len(proxies), name)
+	fmt.Printf("[+] Saved proxy.txt\n", len(proxies), name)
 }
