@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	WorkerCount      = 10000
-	TransportCount   = 500
-	MaxIdleConns     = 5000
-	MaxIdlePerHost   = 200
-	MaxConnsPerHost  = 50
+	WorkerCount      = 1550
+	TransportCount   = 550
+	MaxIdleConns     = 10000
+	MaxIdlePerHost   = 5000
+	MaxConnsPerHost  = 0
 	RequestTimeout   = 2 * time.Second
 	TLSHandshakeTO   = 1 * time.Second
 	ResponseHeaderTO = 1 * time.Second
@@ -98,7 +98,7 @@ func buatTransportSOCKS5(proxyAddr string) (*http.Transport, error) {
 		MaxIdleConns:        MaxIdleConns,
 		MaxIdleConnsPerHost: MaxIdlePerHost,
 		MaxConnsPerHost:     MaxConnsPerHost,
-		IdleConnTimeout:     90 * time.Second,
+		IdleConnTimeout:     3 * time.Second,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
@@ -109,10 +109,10 @@ func buatTransportSOCKS5(proxyAddr string) (*http.Transport, error) {
 	}, nil
 }
 
-func getCPUPercent() (float64, error) {
+func readCPUStats() (uint64, uint64, error) {
 	data, err := os.ReadFile("/proc/stat")
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
@@ -131,10 +131,28 @@ func getCPUPercent() (float64, error) {
 			steal, _ := strconv.ParseUint(fields[8], 10, 64)
 			total := user + nice + system + idle + iowait + irq + softirq + steal
 			idleTotal := idle + iowait
-			return float64(total-idleTotal) / float64(total) * 100, nil
+			return total, idleTotal, nil
 		}
 	}
-	return 0, fmt.Errorf("cannot find cpu stats")
+	return 0, 0, fmt.Errorf("cannot find cpu stats")
+}
+
+func getCPUPercent() (float64, error) {
+	total1, idle1, err := readCPUStats()
+	if err != nil {
+		return 0, err
+	}
+	time.Sleep(100 * time.Millisecond)
+	total2, idle2, err := readCPUStats()
+	if err != nil {
+		return 0, err
+	}
+	totalDelta := total2 - total1
+	idleDelta := idle2 - idle1
+	if totalDelta == 0 {
+		return 0, nil
+	}
+	return float64(totalDelta-idleDelta) / float64(totalDelta) * 100, nil
 }
 
 func statsPrinter(ctx context.Context) {
@@ -145,7 +163,10 @@ func statsPrinter(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			cpu, _ := getCPUPercent()
+			cpu, err := getCPUPercent()
+			if err != nil {
+				continue
+			}
 			fmt.Printf("\r[ CPU ] : %5.1f%%   ", cpu)
 		}
 	}
