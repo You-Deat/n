@@ -481,13 +481,16 @@ customCookie = os.Args[3]
 
 finalURL, err := RES(tgt, customCookie)
 if err != nil {
+fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 fmt.Printf("ޗ | Bypass Gagal : %v\n", err)
 os.Exit(1)
 }
 if finalURL != tgt {
+fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 fmt.Printf("ޗ | Bypass : %s\n", finalURL)
 tgt = finalURL
 } else {
+fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 fmt.Println("ޗ | Bypass : Activated!")
 }
 
@@ -558,15 +561,14 @@ Jar: jar,
 wcs[i] = CLI{client: client, ip: ip}
 }
 fmt.Printf("ޗ | Method : RDT-FLOOD\n")
-fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-fmt.Printf("[+] Target   : %s\n", tgt)
-fmt.Printf("[+] Time     : %d seconds\n", dur)
-fmt.Printf("[+] Proxies  : %d\n", len(proxies))
-fmt.Printf("[+] Conc     : %d\n", wrk)
+fmt.Printf("ޗ | Target : %s\n", tgt)
+fmt.Printf("ޗ | Time   : %d seconds\n", dur)
+fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
+fmt.Printf("ޗ | Conc   : %d\n", wrk)
 if customCookie != "" {
-fmt.Printf("[+] Cookie   : %s\n", customCookie[:30])
+fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
 } else {
-fmt.Printf("[+] Cookie   : False\n")
+fmt.Printf("ޗ | Cookie : False\n")
 }
 fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 
