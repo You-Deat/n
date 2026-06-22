@@ -263,9 +263,9 @@ return false
 }
 
 type PRT struct {
-urlstring
+url string
 code int
-errerror
+err error
 }
 
 func PWR(ctx context.Context, client *http.Client, jobs <-chan string, results chan<- PRT) {
