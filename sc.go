@@ -49,46 +49,91 @@ var proxySources = []string{
 }
 
 func main() {
-	scraped := scrapeProxies()
-	total := len(scraped)
+	// Siapkan tempat menampung semua proxy aktif
+	var allActive []Proxy
 
-	logo := fmt.Sprintf(`
-🚀 Faster HTTP Scraper
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-+ Scrape  : %d
-+ Type    : HTTP
-+ Workers : %d
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`, total, SCRAPE_WORKERS)
-	fmt.Print(logo)
-
-	if total == 0 {
-		return
+	// Cek file proxy.txt
+	if _, err := os.Stat("proxy.txt"); err == nil {
+		loaded, err := loadProxiesFromFile("proxy.txt")
+		if err == nil && len(loaded) > 0 {
+			fmt.Printf("📂 Loaded %d proxies from proxy.txt, checking...\n", len(loaded))
+			activeList := &safeList{proxies: []Proxy{}}
+			checkProxies(activeList, loaded)
+			allActive = append(allActive, activeList.proxies...)
+			fmt.Printf("✅ Found %d active from file\n", len(activeList.proxies))
+		} else {
+			fmt.Println("proxy.txt is empty or invalid, will scrape from GitHub.")
+		}
+	} else {
+		fmt.Println("proxy.txt not found, scraping from GitHub...")
 	}
 
-	activeList := &safeList{proxies: []Proxy{}}
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTSTP)
-	go func() {
-		<-sigCh
-		activeList.mu.Lock()
-		saveToFile(activeList.proxies)
-		activeList.mu.Unlock()
-		os.Exit(0)
-	}()
+	// Scrape dari GitHub
+	fmt.Println("🌐 Scraping proxies from GitHub...")
+	scraped := scrapeProxies()
+	fmt.Printf("📥 Scraped %d proxies\n", len(scraped))
 
-	checkProxies(activeList, scraped)
+	if len(scraped) > 0 {
+		fmt.Println("🔍 Checking scraped proxies...")
+		activeList2 := &safeList{proxies: []Proxy{}}
+		checkProxies(activeList2, scraped)
+		allActive = append(allActive, activeList2.proxies...)
+		fmt.Printf("✅ Found %d active from scraped sources\n", len(activeList2.proxies))
+	}
 
-	if len(activeList.proxies) > 0 {
-		saveToFile(activeList.proxies)
+	// Gabungkan dan hilangkan duplikat
+	unique := make(map[string]Proxy)
+	for _, p := range allActive {
+		key := p.IP + ":" + p.Port
+		unique[key] = p
+	}
+	finalProxies := make([]Proxy, 0, len(unique))
+	for _, p := range unique {
+		finalProxies = append(finalProxies, p)
+	}
+
+	if len(finalProxies) > 0 {
+		saveToFile(finalProxies)
+		fmt.Printf("💾 Saved %d active proxies to proxy.txt\n", len(finalProxies))
+	} else {
+		fmt.Println("⚠️ No active proxies found.")
 	}
 }
+
+// ========== Fungsi pendukung ==========
 
 type safeList struct {
 	mu      sync.Mutex
 	proxies []Proxy
 }
 
+// loadProxiesFromFile membaca proxy dari file teks (satu baris ip:port)
+func loadProxiesFromFile(filename string) ([]Proxy, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var proxies []Proxy
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		ip, port := parseLine(line)
+		if ip != "" && port != "" {
+			proxies = append(proxies, Proxy{IP: ip, Port: port})
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return proxies, nil
+}
+
+// scrapeProxies mengambil proxy dari semua sumber GitHub
 func scrapeProxies() []Proxy {
 	sourceCh := make(chan string, len(proxySources))
 	resultCh := make(chan Proxy, 10000)
@@ -168,6 +213,7 @@ func parseLine(line string) (ip, port string) {
 	return ip, port
 }
 
+// checkProxies memeriksa daftar proxy dan menambahkan yang aktif ke activeList
 func checkProxies(active *safeList, proxies []Proxy) {
 	input := make(chan Proxy, 5000)
 	var wg sync.WaitGroup
@@ -241,5 +287,4 @@ func saveToFile(proxies []Proxy) {
 		w.WriteString(p.IP + ":" + p.Port + "\n")
 	}
 	w.Flush()
-	fmt.Println("[+] Saved proxy.txt")
 }
