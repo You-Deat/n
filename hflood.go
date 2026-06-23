@@ -227,7 +227,7 @@ func main() {
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
 			TLSHandshakeTimeout:   4 * time.Second,
-			ResponseHeaderTimeout: 4 * time.Second,
+			ResponseHeaderTimeout: 3 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
 		ip := ""
