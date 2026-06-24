@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -379,6 +380,7 @@ func Detect_Max_Total_Header_Size(target string) int {
 }
 
 func main() {
+	log.SetOutput(io.Discard)
 	if len(os.Args) < 2 {
 		fmt.Println("Cara pakai: dz-flood <target> [duration] [cookie]")
 		fmt.Println("Contoh: dz-flood https://target.com 60 \"cf_clearance=xxx\"")
