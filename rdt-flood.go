@@ -182,7 +182,6 @@ func RST(rng *rand.Rand, length int) string {
 }
 
 var customCookie string
-var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 
 func main() {
 	log.SetOutput(io.Discard)
@@ -202,9 +201,6 @@ func main() {
 	if len(os.Args) >= 4 {
 		customCookie = os.Args[3]
 	}
-
-	parsed, _ := url.Parse(tgt)
-	host := parsed.Hostname()
 
 	var proxies []*url.URL
 	file, err := os.Open("proxy.txt")
