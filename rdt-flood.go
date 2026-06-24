@@ -37,7 +37,37 @@ type BrowserProfile struct {
 	SecChUa     string
 	SecChUaMov  string
 	SecChUaPlat string
+	Refs        []string
 }
+
+var (
+	refChrome    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	refFirefox   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q=", "https://www.bing.com/search?q="}
+	refEdge      = []string{"https://www.bing.com/search?q=", "https://www.google.com/search?q="}
+	refSafari    = []string{"https://www.google.com/search?q="}
+	refOpera     = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p=", "https://www.bing.com/search?q="}
+	refBrave     = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refVivaldi   = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refTor       = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
+	refPaleMoon  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refWaterfox  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refEpic      = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refSlim      = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	refMaxthon   = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	refAvant     = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	refSeaMonkey = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refIceDragon = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refCyberfox  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refSamsung   = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	refDuckGo    = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
+	refOperaMini = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p="}
+	refFFMobile  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refBraveMob  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refEpiphany  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refMidori    = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refKonqueror = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	refFalkon    = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+)
 
 var profiles = []BrowserProfile{
 	{
@@ -48,6 +78,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Google Chrome";v="144", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
+		Refs:        refChrome,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
@@ -57,6 +88,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
+		Refs:        refFirefox,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
@@ -66,15 +98,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="145", "Microsoft Edge";v="145", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-	},
-	{
-		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
+		Refs:        refEdge,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
@@ -84,33 +108,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Opera";v="130", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-	},
-	{
-		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?1",
-		SecChUaPlat: "Android",
-	},
-	{
-		UA:          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-	},
-	{
-		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/123.0.0.0 Mobile Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="123", "Samsung Internet";v="25", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?1",
-		SecChUaPlat: "Android",
+		Refs:        refOpera,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Brave/144.0.0.0",
@@ -120,15 +118,217 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Brave";v="144", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
+		Refs:        refBrave,
 	},
 	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Vivaldi/7.1.3570.47 Chrome/144.0.0.0 Safari/537.36",
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Vivaldi/7.1.3570.47",
 		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
 		Lang:        "en-US,en;q=0.9",
 		Encoding:    "gzip, deflate, br",
 		SecChUa:     `"Chromium";v="144", "Vivaldi";v="7.1", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
+		Refs:        refVivaldi,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/131.0.0.0 (Edition GX)",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="144", "Opera GX";v="131", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "Windows",
+		Refs:        refOpera,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Arc/1.0.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="146", "Arc";v="1", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "Windows",
+		Refs:        refChrome,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 TorBrowser/12.5.3",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refTor,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:68.0) Gecko/20100101 Goanna/6.4 Firefox/68.0 PaleMoon/33.5.1",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refPaleMoon,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 Waterfox/6.5.2",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refWaterfox,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Epic/146.0.0.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="146", "Epic";v="146", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "Windows",
+		Refs:        refEpic,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 SlimBrowser/15.0.0.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="146", "SlimBrowser";v="15", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "Windows",
+		Refs:        refSlim,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Maxthon/7.1.9.3000",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="144", "Maxthon";v="7.1", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "Windows",
+		Refs:        refMaxthon,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Avant/2024.1.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="145", "Avant";v="2024", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "Windows",
+		Refs:        refAvant,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 SeaMonkey/2.53.19",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refSeaMonkey,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 IceDragon/115.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refIceDragon,
+	},
+	{
+		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 Cyberfox/52.9.1",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refCyberfox,
+	},
+	{
+		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?1",
+		SecChUaPlat: "Android",
+		Refs:        refChrome,
+	},
+	{
+		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/123.0.0.0 Mobile Safari/537.36",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="123", "Samsung Internet";v="25", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?1",
+		SecChUaPlat: "Android",
+		Refs:        refSamsung,
+	},
+	{
+		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) DuckDuckGo/5.0 Chrome/146.0.0.0 Mobile Safari/537.36",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="146", "DuckDuckGo";v="5", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?1",
+		SecChUaPlat: "Android",
+		Refs:        refDuckGo,
+	},
+	{
+		UA:          "Opera/9.80 (Android; Opera Mini/18.0.2254/93.577; U; en) Presto/2.12.423 Version/12.16",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refOperaMini,
+	},
+	{
+		UA:          "Mozilla/5.0 (Android 15; Mobile; rv:136.0) Gecko/136.0 Firefox/136.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refFFMobile,
+	},
+	{
+		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36 Brave/146.0.0.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="146", "Brave";v="146", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?1",
+		SecChUaPlat: "Android",
+		Refs:        refBraveMob,
+	},
+	{
+		UA:          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refSafari,
+	},
+	{
+		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refSafari,
 	},
 	{
 		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Gecko/20100101 Firefox/136.0",
@@ -138,6 +338,27 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
+		Refs:        refFirefox,
+	},
+	{
+		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Brave/145.0.0.0",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="145", "Brave";v="145", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "macOS",
+		Refs:        refBrave,
+	},
+	{
+		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Vivaldi/7.2.3622.47",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     `"Chromium";v="144", "Vivaldi";v="7.2", "Not?A_Brand";v="99"`,
+		SecChUaMov:  "?0",
+		SecChUaPlat: "macOS",
+		Refs:        refVivaldi,
 	},
 	{
 		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
@@ -147,17 +368,52 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="145", "Google Chrome";v="145", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Linux",
+		Refs:        refChrome,
+	},
+	{
+		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/538.1 (KHTML, like Gecko) Falkon/24.08.3 QtWebEngine/6.7.2 Safari/538.1",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refFalkon,
+	},
+	{
+		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Epiphany/45.3 Safari/605.1.15",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refEpiphany,
+	},
+	{
+		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Midori/11.3 Safari/537.36",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refMidori,
+	},
+	{
+		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.21 (KHTML, like Gecko) Konqueror/4.14.38 Safari/537.21",
+		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+		Lang:        "en-US,en;q=0.9",
+		Encoding:    "gzip, deflate, br",
+		SecChUa:     "",
+		SecChUaMov:  "",
+		SecChUaPlat: "",
+		Refs:        refKonqueror,
 	},
 }
 
 var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
 var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
-var REF = []string{
-	"https://www.google.com/search?q=",
-	"https://www.bing.com/search?q=",
-	"https://www.yahoo.com/search?p=",
-	"https://www.duckduckgo.com/?q=",
-}
 
 type CLI struct {
 	client *http.Client
@@ -335,7 +591,7 @@ func main() {
 						headerMap["Accept-Encoding"] = prof.Encoding
 						headerMap["Connection"] = "keep-alive"
 
-						ref := REF[subRng.Intn(len(REF))]
+						ref := prof.Refs[subRng.Intn(len(prof.Refs))]
 						ref += RST(subRng, 20) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
 						headerMap["Referer"] = ref
 
