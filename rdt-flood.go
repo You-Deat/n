@@ -426,8 +426,7 @@ func main() {
 	maxPayload := Detect_Pyload(tgt)
 	maxHeader := Detect_Header_Support(tgt)
 	caps := Detect_Headers_Costum(tgt, proxyIP)
-	maxTotalHeader := Detect_Max_Total_Header_Size(tgt)
-	maxTotalHeader = 0
+	_ = Detect_Max_Total_Header_Size(tgt)
 
 	wcs := make([]CLI, len(proxies))
 	for i, proxyURL := range proxies {
