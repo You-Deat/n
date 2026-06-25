@@ -403,7 +403,7 @@ func main() {
 	fmt.Println("  MMMMP\"`   `\"\"*UMM       \"YUMMMMMP\"MMMUP*\"^^")
 	fmt.Printf("%s", Reset)
 
-	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
 
 	printInfo := func(label, value, status string) {
 		if status != "" {
@@ -424,21 +424,21 @@ func main() {
 		}
 	}
 	printInfo("Target", host, "")
-	printInfo("Port  ", "443      ", "True")
-	printInfo("Method", "H-FLOOD  ", "True")
-	printInfo("Ulimit", "1048576  ", "True")
-	printInfo("Proxy ", fmt.Sprintf("%d      ", len(PRX)), "True")
-	printInfo("Worker", fmt.Sprintf("%d     ", wrk), "True")
+	printInfo("Port  ", "443         ", "True")
+	printInfo("Method", "H-FLOOD     ", "True")
+	printInfo("Ulimit", "1048576     ", "True")
+	printInfo("Proxy ", fmt.Sprintf("%d         ", len(PRX)), "True")
+	printInfo("Worker", fmt.Sprintf("%d        ", wrk), "True")
 
 	if customCookie != "" {
-		fmt.Printf("%s〇%s %sCookie%s %s:%s %s          [%s%s%s]\n",
+		fmt.Printf("%s〇%s %sCookie%s %s:%s %s             [%s%s%s]\n",
 			Green, Reset,
 			White, Reset,
 			Red, Reset,
 			Red, Green, "True", Red,
 		)
 	} else {
-		fmt.Printf("%s〇%s %sCookie%s %s:%s %s          [%s%s%s]\n",
+		fmt.Printf("%s〇%s %sCookie%s %s:%s %s             [%s%s%s]\n",
 			Green, Reset,
 			White, Reset,
 			Red, Reset,
@@ -446,7 +446,7 @@ func main() {
 		)
 	}
 
-	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
 
 	startTime := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -464,7 +464,7 @@ func main() {
 				if elapsed > dur && dur > 0 {
 					elapsed = dur
 				}
-				fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s   %s[%s%s%s]\033[K",
+				fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s      %s[%s%s%s]\033[K",
 					Green, Reset,
 					White, Reset,
 					Red, Reset,
