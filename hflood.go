@@ -24,6 +24,7 @@ import (
 const (
 	Reset       = "\033[0m"
 	Red         = "\033[31m"
+	Green       = "\033[32m"
 	White       = "\033[37m"
 	RedBright   = "\033[91m"
 	RedLight    = "\033[38;5;203m"
@@ -307,6 +308,9 @@ func main() {
 
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
+	if strings.HasPrefix(host, "www.") {
+		host = host[4:]
+	}
 
 	var PRX []*url.URL
 	file, err := os.Open("proxy.txt")
@@ -401,24 +405,76 @@ func main() {
 
 	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
 
-	printInfo := func(label, value string) {
-		fmt.Printf("%s%s%s %s:%s %s%s%s\n", White, label, Reset, Red, Reset, White, value, Reset)
+	printInfo := func(label, value, status string) {
+		if status != "" {
+			fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s %s[%s%s%s]\n",
+				Green, Reset,
+				White, label, Reset,
+				Red, Reset,
+				White, value, Reset,
+				Red, Green, status, Red,
+			)
+		} else {
+			fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s\n",
+				Green, Reset,
+				White, label, Reset,
+				Red, Reset,
+				White, value, Reset,
+			)
+		}
 	}
-	printInfo("Method", "H-FLOOD")
-	printInfo("Ulimit", "1048576")
-	printInfo("Target", tgt)
-	printInfo("Time  ", fmt.Sprintf("%d/s", dur))
-	printInfo("Proxy ", fmt.Sprintf("%d", len(PRX)))
-	printInfo("Worker", fmt.Sprintf("%d", wrk))
+	printInfo("Target", host, "")
+	printInfo("Port  ", "443      ", "True")
+	printInfo("Method", "H-FLOOD  ", "True")
+	printInfo("Ulimit", "1048576  ", "True")
+	printInfo("Proxy ", fmt.Sprintf("%d      ", len(PRX)), "True")
+	printInfo("Worker", fmt.Sprintf("%d     ", wrk), "True")
+
 	if customCookie != "" {
-		printInfo("Cookie", customCookie[:30])
+		fmt.Printf("%s〇%s %sCookie%s %s:%s %s          [%s%s%s]\n",
+			Green, Reset,
+			White, Reset,
+			Red, Reset,
+			Red, Green, "True", Red,
+		)
 	} else {
-		printInfo("Cookie", "False")
+		fmt.Printf("%s〇%s %sCookie%s %s:%s %s          [%s%s%s]\n",
+			Green, Reset,
+			White, Reset,
+			Red, Reset,
+			White, Red, "None", White,
+		)
 	}
 
-	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n\n\n", Red, Reset)
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
 
+	startTime := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Printf("\r%*s\r", 80, "")
+				return
+			case <-ticker.C:
+				elapsed := int(time.Since(startTime).Seconds())
+				if elapsed > dur && dur > 0 {
+					elapsed = dur
+				}
+				fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s   %s[%s%s%s]\033[K",
+					Green, Reset,
+					White, Reset,
+					Red, Reset,
+					White, elapsed, dur, Reset,
+					Red, Green, "True", Red,
+				)
+			}
+		}
+	}()
+
 	var wg sync.WaitGroup
 
 	if dur > 0 {
@@ -563,5 +619,7 @@ func main() {
 		cancel()
 	case <-ctx.Done():
 	}
+
 	wg.Wait()
+	fmt.Println()
 }
