@@ -463,7 +463,7 @@ elapsed := int(time.Since(startTime).Seconds())
 if elapsed > dur && dur > 0 {
 elapsed = dur
 }
-fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                    %s[%s%s%s]\033[K",
+fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                   %s[%s%s%s]\033[K",
 Green, Reset,
 White, Reset,
 Red, Reset,
