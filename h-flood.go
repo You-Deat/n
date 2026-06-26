@@ -402,7 +402,7 @@ fmt.Println("  888_,o8P',888bo,_     `88bo,__,o, d88 _,oo,")
 fmt.Printf("%s", RedBright)
 fmt.Println("  MMMMP\"`   `\"\"*UMM       \"YUMMMMMP\"MMMUP*\"^^")
 fmt.Printf("%s", Reset)
-fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
+fmt.Printf("%s\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
 printInfo := func(label, value, status string) {
 if status != "" {
 fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s %s[%s%s%s]\n",
@@ -421,7 +421,6 @@ White, value, Reset,
 )
 }
 }
-//printInfo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 printInfo("Target", host, "")
 printInfo("Port  ", "443                        ", "True")
 printInfo("Method", "H-FLOOD                    ", "True")
@@ -463,7 +462,7 @@ elapsed := int(time.Since(startTime).Seconds())
 if elapsed > dur && dur > 0 {
 elapsed = dur
 }
-fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                   %s[%s%s%s]\033[K",
+fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                    %s[%s%s%s]\033[K",
 Green, Reset,
 White, Reset,
 Red, Reset,
