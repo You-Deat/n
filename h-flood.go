@@ -421,22 +421,23 @@ White, value, Reset,
 )
 }
 }
+//printInfo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 printInfo("Target", host, "")
-printInfo("Port  ", "443         ", "True")
-printInfo("Method", "H-FLOOD     ", "True")
-printInfo("Ulimit", "1048576     ", "True")
-printInfo("Proxy ", fmt.Sprintf("%d         ", len(PRX)), "True")
-printInfo("Worker", fmt.Sprintf("%d        ", wrk), "True")
+printInfo("Port  ", "443                        ", "True")
+printInfo("Method", "H-FLOOD                    ", "True")
+printInfo("Ulimit", "1048576                    ", "True")
+printInfo("Proxy ", fmt.Sprintf("%d                        ", len(PRX)), "True")
+printInfo("Worker", fmt.Sprintf("%d                       ", wrk), "True")
 
 if customCookie != "" {
-fmt.Printf("%s〇%s %sCookie%s %s:%s %s             [%s%s%s]\n",
+fmt.Printf("%s〇%s %sCookie%s %s:%s %s                            [%s%s%s]\n",
 Green, Reset,
 White, Reset,
 Red, Reset,
 Red, Green, "True", Red,
 )
 } else {
-fmt.Printf("%s〇%s %sCookie%s %s:%s %s             [%s%s%s]\n",
+fmt.Printf("%s〇%s %sCookie%s %s:%s %s                            [%s%s%s]\n",
 Green, Reset,
 White, Reset,
 Red, Reset,
@@ -462,7 +463,7 @@ elapsed := int(time.Since(startTime).Seconds())
 if elapsed > dur && dur > 0 {
 elapsed = dur
 }
-fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s      %s[%s%s%s]\033[K",
+fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                     %s[%s%s%s]\033[K",
 Green, Reset,
 White, Reset,
 Red, Reset,
