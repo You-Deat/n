@@ -34,15 +34,15 @@ LightPink = "\033[38;5;218m"
 WhiteBright = "\033[97m"
 
 // ====== Tergantung spek ==========
-Speed = 7500
+Speed = 7500 // Kalo vps lu kentang turunin tak
 
 
 // ====== Tergantung Proxy ==========
-to = 6 * time.Second
+to = 6 * time.Second // Timeout
 
 
 // ====== Tergantung Target ==========
-KEP = 30 * time.Second
+KEP = 30 * time.Second // Keep-Alive
 )
 
 // Prof
@@ -414,8 +414,8 @@ DisableCompression: false,
 
 
 // ====== Tergantung spek ==========
-MaxIdleConns: 50000,
-MaxIdleConnsPerHost: 50000,
+MaxIdleConns: 50000, // Turunin kalo vps gakuat
+MaxIdleConnsPerHost: 50000, // Turunin
 MaxConnsPerHost: 0,
 IdleConnTimeout: KEP,
 TLSClientConfig: &tls.Config{
@@ -460,17 +460,17 @@ wcs[i] = CLI{client: client, ip: ip}}
 
 // Logo
 fmt.Printf("%s", WhiteBright)
-fmt.Println("\n:::::::-. ::::::::: .,~::::: .:::.")
+fmt.Println("\n:::::::-.  :::::::::      .,~:::::    .:::.")
 fmt.Printf("%s", LightPink)
-fmt.Println(" ;;, `';,'`````;;; ,;;;'````' ,;'``;.")
+fmt.Println(" ;;,   `';,'`````;;;    ,;;;'````'   ,;'``;.")
 fmt.Printf("%s", RedPink)
-fmt.Println(" `[[ [[ .n[[' [[[ '' ,['")
+fmt.Println(" `[[     [[    .n[['    [[[          ''  ,['")
 fmt.Printf("%s", RedLight)
-fmt.Println(" $$, $$ ,$$P\" cccc $$$ .c$$P'")
+fmt.Println("  $$,    $$  ,$$P\" cccc $$$          .c$$P'")
 fmt.Printf("%s", Red)
-fmt.Println(" 888_,o8P',888bo,_ `88bo,__,o, d88 _,oo,")
+fmt.Println("  888_,o8P',888bo,_     `88bo,__,o, d88 _,oo,")
 fmt.Printf("%s", RedBright)
-fmt.Println(" MMMMP\"` `\"\"*UMM \"YUMMMMMP\"MMMUP*\"^^")
+fmt.Println("  MMMMP\"`   `\"\"*UMM       \"YUMMMMMP\"MMMUP*\"^^")
 fmt.Printf("%s", Reset)
 fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", Red, Reset)
 printInfo := func(label, value, status string) {
@@ -491,10 +491,10 @@ Red, Reset,
 White, value, Reset,)}}
 
 // Info
+printInfo("Author", "Diz Flyze Ofc              ", "True")
 printInfo("Target", host, "")
 printInfo("Port  ", "443                        ", "True")
-printInfo("Author", "Diz Flyze Ofc               ", "True")
-printInfo("Method", "H-FLOOD                    ", "True")
+printInfo("Method", "H-FLOODV2                  ", "True")
 printInfo("Ulimit", "1048576                    ", "True")
 printInfo("Proxy ", fmt.Sprintf("%d                        ", len(PRX)), "True")
 printInfo("Worker", fmt.Sprintf("%d                       ", Speed), "True")
@@ -533,7 +533,7 @@ if elapsed > dur && dur > 0 {
 elapsed = dur
 }
 // Time
-fmt.Printf("\r%s〇%s %sTime %s %s:%s %s%02d/%ds%s %s[%s%s%s]\033[K",
+fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                    %s[%s%s%s]\033[K",
 Green, Reset,
 White, Reset,
 Red, Reset,
