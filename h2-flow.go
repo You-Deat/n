@@ -659,10 +659,10 @@ if len(proxyIPs) > 0 {
 ProxyX = proxyIPs[0]}
 
 // ================== BYPASS PARALEL ==================
-fmt.Printf("%s▶ Proses Bypass (Paralel)!%s\n", IJO, HAPUS)
+fmt.Printf("%s▶ Proses Bypass!%s\n", IJO, HAPUS)
 
 var wg sync.WaitGroup
-wg.Add(10)
+wg.Add(11)
 
 var MaxP, MaxHead int
 var Supported map[string]bool
