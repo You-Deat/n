@@ -1,4 +1,4 @@
-// ================== H2-FLOW ==================
+// ================== H2-FLOW (FIXED PROBE) ==================
 package main
 
 import (
@@ -727,7 +727,7 @@ func main() {
 		ProxyX = proxyIPs[0]
 	}
 
-	// ================== BYPASS (ASYNC) ==================
+	// ================== BYPASS (ASYNC - TANPA FALLBACK PAKSA) ==================
 	fmt.Printf("%s▶ Proses Bypass Target!%s\n", IJO, HAPUS)
 
 	var wgProbe sync.WaitGroup
@@ -748,105 +748,74 @@ func main() {
 		totalProbes = 11
 	)
 
-	runProbe := func(probeFunc func() interface{}, setter func(interface{}), fallback interface{}) {
+	// ========== Fungsi probe baru (TANPA hard timeout) ==========
+	runProbe := func(probeFunc func() interface{}, setter func(interface{})) {
 		wgProbe.Add(1)
 		go func() {
 			defer wgProbe.Done()
-
-			done := make(chan struct{})
-			var result interface{}
-
-			go func() {
-				result = probeFunc()
-				close(done)
-			}()
-
-			select {
-			case <-done:
-				mu.Lock()
-				setter(result)
-				mu.Unlock()
-			case <-time.After(10 * time.Second): 
-				mu.Lock()
-				setter(fallback)
-				mu.Unlock()
-			}
+			// Jalankan fungsi probe dan tunggu hasil asli (sudah ada timeout internal)
+			result := probeFunc()
+			mu.Lock()
+			setter(result)
+			mu.Unlock()
 			atomic.AddInt32(&completed, 1)
 		}()
 	}
 
-	// Jalankan semua probe
+	// Jalankan semua probe secara paralel (tanpa fallback paksa)
 	runProbe(
 		func() interface{} { return PMP(tgt) },
 		func(v interface{}) { MaxP = v.(int) },
-		512,
 	)
 
 	runProbe(
 		func() interface{} { return PMH(tgt) },
 		func(v interface{}) { MaxHead = v.(int) },
-		2048,
 	)
 
 	runProbe(
 		func() interface{} { return PHR(tgt, ProxyX) },
 		func(v interface{}) { Supported = v.(map[string]bool) },
-		map[string]bool{
-			"X-Original-URL":   true,
-			"X-Forwarded-Host": true,
-			"X-Request-ID":     true,
-			"CDN-Loop":         true,
-			"CF-Connecting-IP": true,
-			"True-Client-IP":   true,
-		},
 	)
 
 	runProbe(
 		func() interface{} { return HSUPPORT(tgt) },
 		func(v interface{}) { HVERSI = v.(string) },
-		"H2",
 	)
 
 	runProbe(
 		func() interface{} { return ORIGIN(tgt) },
 		func(v interface{}) { VORI = v.([]string) },
-		[]string{"https://" + host},
 	)
 
 	runProbe(
 		func() interface{} { return UA_TEST(tgt) },
 		func(v interface{}) { VUAS = v.([]string) },
-		[]string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"},
 	)
 
 	runProbe(
 		func() interface{} { return REFFERER(tgt) },
 		func(v interface{}) { VREF = v.([]string) },
-		[]string{"https://" + host + "/"},
 	)
 
 	runProbe(
 		func() interface{} { return PPHEAD(tgt, proxyIPs) },
 		func(v interface{}) { VIPS = v.([]string) },
-		[]string{"127.0.0.1"},
 	)
 
 	runProbe(
 		func() interface{} { return HMETHOD(tgt) },
 		func(v interface{}) { VMET = v.([]string) },
-		[]string{"GET"},
 	)
 
 	runProbe(
 		func() interface{} { return ENCOD(tgt) },
 		func(v interface{}) { VENC = v.([]string) },
-		[]string{"gzip, deflate, br"},
 	)
 
 	runProbe(
 		func() interface{} { return CACH(tgt) },
 		func(v interface{}) { VCAC = v.([]string) },
-		[]string{"no-cache"},
 	)
 
 	// Tampilkan progres
