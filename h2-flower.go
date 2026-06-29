@@ -33,9 +33,9 @@ const (
 	PUNYAMU        = "\033[38;5;204m"
 	PUNYA_LU_PUCAT = "\033[38;5;218m"
 	MASA_DEPAN_NYA = "\033[97m"
-	Speed          = 5000
-	to             = 6 * time.Second
-	MaxConcurrent  = 2000
+	Speed          = 8000
+	to             = 4 * time.Second
+	MaxConcurrent  = 3000
 )
 
 type FullProfile struct {
@@ -293,8 +293,8 @@ func main() {
 			Timeout:   5 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		MaxIdleConns:         2000,
-		MaxIdleConnsPerHost:  1000,
+		MaxIdleConns:         5000,
+		MaxIdleConnsPerHost:  2500,
 		MaxConnsPerHost:      0,
 		IdleConnTimeout:      300 * time.Second,
 		TLSHandshakeTimeout:  3 * time.Second,
