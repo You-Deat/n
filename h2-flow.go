@@ -732,7 +732,6 @@ func main() {
 	}
 
 	// ================== BYPASS (PROBING PARALEL) ==================
-	fmt.Printf("%s▶ Proses Bypass!%s\n", IJO, HAPUS)
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	var (
@@ -821,8 +820,7 @@ func main() {
 	}()
 
 	wg.Wait()
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Printf("%s\n▶ Done Bypassing%s\n\n", IJO, HAPUS)
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	PRLT := PREST{
 		VOR: VORI,
