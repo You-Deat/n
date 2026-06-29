@@ -506,7 +506,7 @@ func PPHEAD(target string, proxyIPs []string) []string {
 	}
 	var valid []string
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 3 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
@@ -733,6 +733,7 @@ func main() {
 
 	// ================== BYPASS (PROBING PARALEL) ==================
 	fmt.Printf("%s▶ Proses Bypass!%s\n", IJO, HAPUS)
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	var (
 		MaxP      int
@@ -749,21 +750,79 @@ func main() {
 	)
 
 	var wg sync.WaitGroup
-	wg.Add(11) // jumlah fungsi probing
+	wg.Add(11)
 
-	go func() { defer wg.Done(); MaxP = PMP(tgt) }()
-	go func() { defer wg.Done(); MaxHead = PMH(tgt) }()
-	go func() { defer wg.Done(); Supported = PHR(tgt, ProxyX) }()
-	go func() { defer wg.Done(); HVERSI = HSUPPORT(tgt) }()
-	go func() { defer wg.Done(); VORI = ORIGIN(tgt) }()
-	go func() { defer wg.Done(); VUAS = UA_TEST(tgt) }()
-	go func() { defer wg.Done(); VREF = REFFERER(tgt) }()
-	go func() { defer wg.Done(); VIPS = PPHEAD(tgt, proxyIPs) }()
-	go func() { defer wg.Done(); VMET = HMETHOD(tgt) }()
-	go func() { defer wg.Done(); VENC = ENCOD(tgt) }()
-	go func() { defer wg.Done(); VCAC = CACH(tgt) }()
+	var probeDone int
+	var probeMu sync.Mutex
 
-	wg.Wait() // semua probe selesai
+	// fungsi helper buat print progress
+	printProbe := func(name string) {
+		probeMu.Lock()
+		probeDone++
+		done := probeDone
+		probeMu.Unlock()
+		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/11)
+	}
+
+	go func() {
+		defer wg.Done()
+		MaxP = PMP(tgt)
+		printProbe("PMP")
+	}()
+	go func() {
+		defer wg.Done()
+		MaxHead = PMH(tgt)
+		printProbe("PMH")
+	}()
+	go func() {
+		defer wg.Done()
+		Supported = PHR(tgt, ProxyX)
+		printProbe("PHR")
+	}()
+	go func() {
+		defer wg.Done()
+		HVERSI = HSUPPORT(tgt)
+		printProbe("HSP")
+	}()
+	go func() {
+		defer wg.Done()
+		VORI = ORIGIN(tgt)
+		printProbe("ORIGIN")
+	}()
+	go func() {
+		defer wg.Done()
+		VUAS = UA_TEST(tgt)
+		printProbe("UA")
+	}()
+	go func() {
+		defer wg.Done()
+		VREF = REFFERER(tgt)
+		printProbe("REFFERER")
+	}()
+	go func() {
+		defer wg.Done()
+		VIPS = PPHEAD(tgt, proxyIPs)
+		printProbe("PPHEAD")
+	}()
+	go func() {
+		defer wg.Done()
+		VMET = HMETHOD(tgt)
+		printProbe("HMETHOD")
+	}()
+	go func() {
+		defer wg.Done()
+		VENC = ENCOD(tgt)
+		printProbe("ENCOD")
+	}()
+	go func() {
+		defer wg.Done()
+		VCAC = CACH(tgt)
+		printProbe("CACHE")
+	}()
+
+	wg.Wait()
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Printf("%s\n▶ Done Bypassing%s\n\n", IJO, HAPUS)
 
 	PRLT := PREST{
 		VOR: VORI,
