@@ -235,9 +235,6 @@ type ProbeResult struct {
 	SupportsPing        bool
 	SupportsSettings    bool
 	SupportsWindowUpdate bool
-	CacheBypassParams   []string
-	CacheBypassHeaders  []string
-	PathVariations      []string
 	MaxConcurrentStreams int
 	InitialWindowSize   int
 	MaxFrameSize        int
@@ -274,6 +271,9 @@ func generateBypassCookie() string {
 }
 
 func randomElement(arr []string) string {
+	if len(arr) == 0 {
+		return ""
+	}
 	return arr[rand.Intn(len(arr))]
 }
 
@@ -1250,6 +1250,30 @@ func main() {
 		printProbe("Advanced")
 	}()
 	wg.Wait()
+
+	// Safety checks: ensure slices are not empty
+	if len(probeResult.ValidMethods) == 0 {
+		probeResult.ValidMethods = []string{"GET"}
+	}
+	if len(probeResult.ValidUserAgents) == 0 {
+		probeResult.ValidUserAgents = []string{"Mozilla/5.0"}
+	}
+	if len(probeResult.ValidReferers) == 0 {
+		probeResult.ValidReferers = []string{""}
+	}
+	if len(probeResult.ValidEncodings) == 0 {
+		probeResult.ValidEncodings = []string{"gzip, deflate, br"}
+	}
+	if len(probeResult.ValidCacheControls) == 0 {
+		probeResult.ValidCacheControls = []string{"no-cache"}
+	}
+	if len(probeResult.ValidOrigins) == 0 {
+		probeResult.ValidOrigins = []string{""}
+	}
+	if probeResult.SupportedHeaders == nil {
+		probeResult.SupportedHeaders = make(map[string]bool)
+	}
+
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
 	fmt.Printf("%s", MASA_DEPAN_NYA)
@@ -1730,6 +1754,9 @@ func main() {
 					req.Header.Set(h.key, h.value)
 				}
 
+				if cli.client == nil {
+					continue
+				}
 				resp, err := cli.client.Do(req)
 				if err == nil {
 					io.Copy(io.Discard, resp.Body)
