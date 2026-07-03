@@ -835,7 +835,7 @@ func main() {
 	printInfo("Author", "Diz Flyze Ofc              ", "True")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
-	printInfo("Method", "H2-FLOOD                   ", "True")
+	printInfo("Method", "H2-BYPASS                  ", "True")
 	printInfo("Proxy ", fmt.Sprintf("%d                        ", len(proxies)), "True")
 	printInfo("Worker", fmt.Sprintf("%d                       ", WORKER_COUNT), "True")
 	printInfo("HTTP  ", fmt.Sprintf("%-24s   ", httpVersion), "True")
