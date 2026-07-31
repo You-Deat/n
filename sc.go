@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	SCRAPE_WORKERS = 7500
-	CHECK_WORKERS  = 7500
+	SCRAPE_WORKERS = 1500
+	CHECK_WORKERS  = 1500
 	CHECK_TIMEOUT  = 4 * time.Second
 	RETRY_COUNT    = 1
 	TARGET         = 2000
