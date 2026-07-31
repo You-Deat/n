@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	SCRAPE_WORKERS = 1500
-	CHECK_WORKERS  = 1500
-	CHECK_TIMEOUT  = 3 * time.Second
+	SCRAPE_WORKERS = 7500
+	CHECK_WORKERS  = 7500
+	CHECK_TIMEOUT  = 4 * time.Second
 	RETRY_COUNT    = 1
+	TARGET         = 2000
 )
 
 type Proxy struct {
@@ -30,8 +31,9 @@ type Proxy struct {
 }
 
 var (
-	activeList = &safeList{proxies: []Proxy{}}
-	proxySources = []string{
+	activeList    = &safeList{proxies: []Proxy{}}
+	seenProxies   = &safeSet{items: make(map[string]bool)} // track proxy yang sudah diperiksa
+	proxySources  = []string{
 		"https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
 		"https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt",
 		"https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-http.txt",
@@ -56,6 +58,23 @@ type safeList struct {
 	proxies []Proxy
 }
 
+type safeSet struct {
+	mu    sync.Mutex
+	items map[string]bool
+}
+
+func (s *safeSet) Add(key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.items[key] = true
+}
+
+func (s *safeSet) Has(key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.items[key]
+}
+
 func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTSTP)
@@ -71,15 +90,41 @@ func main() {
 		os.Exit(0)
 	}()
 
+	// Load existing proxy.txt, tandai sebagai sudah dilihat, dan periksa ulang
 	if _, err := os.Stat("proxy.txt"); err == nil {
 		if proxies, err := loadProxiesFromFile("proxy.txt"); err == nil && len(proxies) > 0 {
+			for _, p := range proxies {
+				seenProxies.Add(p.IP + ":" + p.Port)
+			}
 			checkProxies(proxies)
 		}
 	}
-	scraped := scrapeProxies()
-	if len(scraped) > 0 {
-		checkProxies(scraped)
+
+	// Loop utama: scrape dan check sampai target tercapai atau kehabisan proxy baru
+	for len(activeList.proxies) < TARGET {
+		fmt.Printf("Active: %d, scraping new proxies...\n", len(activeList.proxies))
+
+		scraped := scrapeProxies()
+		var newProxies []Proxy
+		for _, p := range scraped {
+			key := p.IP + ":" + p.Port
+			if !seenProxies.Has(key) {
+				newProxies = append(newProxies, p)
+				seenProxies.Add(key)
+			}
+		}
+
+		if len(newProxies) == 0 {
+			fmt.Println("Tidak ada proxy baru dari sumber. Berhenti.")
+			break
+		}
+
+		fmt.Printf("Memeriksa %d proxy baru...\n", len(newProxies))
+		checkProxies(newProxies)
+		// TIDAK ADA JEDA, LANGSUNG LOOP LAGI
 	}
+
+	// Simpan hasil akhir
 	activeList.mu.Lock()
 	if len(activeList.proxies) > 0 {
 		unique := make(map[string]Proxy)
@@ -92,9 +137,13 @@ func main() {
 		}
 		saveToFile(final)
 		fmt.Printf("Saved %d active proxies.\n", len(final))
+	} else {
+		fmt.Println("Tidak ada proxy aktif ditemukan.")
 	}
 	activeList.mu.Unlock()
 }
+
+// ===== FUNGSI LAIN (TIDAK DIUBAH) =====
 
 func loadProxiesFromFile(name string) ([]Proxy, error) {
 	f, err := os.Open(name)
